@@ -49,11 +49,19 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              286.1
+Version:              300.1
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              cockpit.css.gz
 
+
+%if 0%{?fedora} >= 38 || 0%{?rhel} >= 9
+%define cockpit_enable_python 1
+%endif
+
+%if !%{defined cockpit_enable_python}
+%define cockpit_enable_python 0
+%endif
 
 # in RHEL 8 the source package is duplicated: cockpit (building basic packages like cockpit-{bridge,system})
 # and cockpit-appstream (building optional packages like cockpit-{pcp})
@@ -163,6 +171,20 @@ Suggests:             cockpit-selinux
 Requires:             subscription-manager-cockpit
 %endif
 
+%if %{cockpit_enable_python}
+BuildRequires:        python3-devel
+BuildRequires:        python3-pip
+%if 0%{?rhel} == 0
+# All of these are only required for running pytest (which we only do on Fedora)
+BuildRequires:        procps-ng
+BuildRequires:        pyproject-rpm-macros
+BuildRequires:        python3-pytest-asyncio
+BuildRequires:        python3-pytest-cov
+BuildRequires:        python3-pytest-timeout
+BuildRequires:        python3-tox-current-env
+%endif
+%endif
+
 %prep
 %setup -q -n cockpit-%{version}
 
@@ -175,6 +197,9 @@ Requires:             subscription-manager-cockpit
     --docdir=%_defaultdocdir/%{name} \
 %endif
     --with-pamdir='%{pamdir}' \
+%if %{cockpit_enable_python}
+    --enable-pybridge \
+%endif
 %if 0%{?build_basic} == 0
     --disable-ssh \
 %endif
@@ -183,6 +208,10 @@ Requires:             subscription-manager-cockpit
 
 %check
 make -j$(nproc) check
+
+%if %{cockpit_enable_python} && 0%{?rhel} == 0
+%tox
+%endif
 
 %install
 %make_install
@@ -209,9 +238,6 @@ echo '%{_libexecdir}/cockpit-ssh' >> base.list
 
 echo '%dir %{_datadir}/cockpit/pcp' > pcp.list
 find %{buildroot}%{_datadir}/cockpit/pcp -type f >> pcp.list
-
-echo '%dir %{_datadir}/cockpit/tuned' > system.list
-find %{buildroot}%{_datadir}/cockpit/tuned -type f >> system.list
 
 echo '%dir %{_datadir}/cockpit/shell' >> system.list
 find %{buildroot}%{_datadir}/cockpit/shell -type f >> system.list
@@ -255,7 +281,7 @@ find %{buildroot}%{_datadir}/cockpit/static -type f >> static.list
 
 # when not building basic packages, remove their files
 %if 0%{?build_basic} == 0
-for pkg in base1 branding motd kdump networkmanager selinux shell sosreport ssh static systemd tuned users metrics; do
+for pkg in base1 branding motd kdump networkmanager selinux shell sosreport ssh static systemd users metrics; do
     rm -r %{buildroot}/%{_datadir}/cockpit/$pkg
     rm -f %{buildroot}/%{_datadir}/metainfo/org.cockpit-project.cockpit-${pkg}.metainfo.xml
 done
@@ -264,14 +290,15 @@ for data in doc man pixmaps polkit-1; do
 done
 rm -r %{buildroot}/%{_prefix}/%{__lib}/tmpfiles.d
 find %{buildroot}/%{_unitdir}/ -type f ! -name 'cockpit-session*' -delete
-for libexec in cockpit-askpass cockpit-session cockpit-ws cockpit-tls cockpit-wsinstance-factory cockpit-client cockpit-client.ui cockpit-desktop cockpit-certificate-helper cockpit-certificate-ensure; do
-    rm %{buildroot}/%{_libexecdir}/$libexec
+for libexec in cockpit-askpass cockpit-beiboot cockpit-session cockpit-ws cockpit-tls cockpit-wsinstance-factory cockpit-client cockpit-client.ui cockpit-desktop cockpit-certificate-helper cockpit-certificate-ensure; do
+    rm -f %{buildroot}/%{_libexecdir}/$libexec
 done
 rm -r %{buildroot}/%{_sysconfdir}/pam.d %{buildroot}/%{_sysconfdir}/motd.d %{buildroot}/%{_sysconfdir}/issue.d
 rm -f %{buildroot}/%{_libdir}/security/pam_*
-rm %{buildroot}/usr/bin/cockpit-bridge
+rm -f %{buildroot}/usr/bin/cockpit-bridge
 rm -f %{buildroot}%{_libexecdir}/cockpit-ssh
 rm -f %{buildroot}%{_datadir}/metainfo/cockpit.appdata.xml
+rm -rf %{buildroot}%{python3_sitelib}/cockpit*
 %endif
 
 # when not building optional packages, remove their files
@@ -352,6 +379,10 @@ system on behalf of the web based user interface.
 %doc %{_mandir}/man1/cockpit-bridge.1.gz
 %{_bindir}/cockpit-bridge
 %{_libexecdir}/cockpit-askpass
+%if %{cockpit_enable_python}
+%{python3_sitelib}/%{name}*
+%{_libexecdir}/cockpit-beiboot
+%endif
 
 %package doc
 Summary:              Cockpit deployment and developer guide
@@ -399,6 +430,80 @@ Provides:             cockpit-sosreport = %{version}-%{release}
 %if 0%{?fedora}
 Recommends:           (reportd if abrt)
 %endif
+
+Provides:             bundled(npm(@patternfly/patternfly)) = 5.0.2
+Provides:             bundled(npm(@patternfly/react-core)) = 5.0.0
+Provides:             bundled(npm(@patternfly/react-icons)) = 5.0.0
+Provides:             bundled(npm(@patternfly/react-styles)) = 5.0.0
+Provides:             bundled(npm(@patternfly/react-table)) = 5.0.0
+Provides:             bundled(npm(@patternfly/react-tokens)) = 5.0.0
+Provides:             bundled(npm(argparse)) = 1.0.10
+Provides:             bundled(npm(attr-accept)) = 2.2.2
+Provides:             bundled(npm(autolinker)) = 3.16.2
+Provides:             bundled(npm(available-typed-arrays)) = 1.0.5
+Provides:             bundled(npm(call-bind)) = 1.0.2
+Provides:             bundled(npm(deep-equal)) = 2.0.5
+Provides:             bundled(npm(define-properties)) = 1.2.0
+Provides:             bundled(npm(es-get-iterator)) = 1.1.3
+Provides:             bundled(npm(file-selector)) = 0.6.0
+Provides:             bundled(npm(focus-trap)) = 7.4.3
+Provides:             bundled(npm(for-each)) = 0.3.3
+Provides:             bundled(npm(function-bind)) = 1.1.1
+Provides:             bundled(npm(functions-have-names)) = 1.2.3
+Provides:             bundled(npm(get-intrinsic)) = 1.2.1
+Provides:             bundled(npm(gopd)) = 1.0.1
+Provides:             bundled(npm(has-bigints)) = 1.0.2
+Provides:             bundled(npm(has-property-descriptors)) = 1.0.0
+Provides:             bundled(npm(has-proto)) = 1.0.1
+Provides:             bundled(npm(has-symbols)) = 1.0.3
+Provides:             bundled(npm(has-tostringtag)) = 1.0.0
+Provides:             bundled(npm(has)) = 1.0.3
+Provides:             bundled(npm(internal-slot)) = 1.0.5
+Provides:             bundled(npm(is-arguments)) = 1.1.1
+Provides:             bundled(npm(is-bigint)) = 1.0.4
+Provides:             bundled(npm(is-boolean-object)) = 1.1.2
+Provides:             bundled(npm(is-callable)) = 1.2.7
+Provides:             bundled(npm(is-date-object)) = 1.0.5
+Provides:             bundled(npm(is-map)) = 2.0.2
+Provides:             bundled(npm(is-number-object)) = 1.0.7
+Provides:             bundled(npm(is-regex)) = 1.1.4
+Provides:             bundled(npm(is-set)) = 2.0.2
+Provides:             bundled(npm(is-string)) = 1.0.7
+Provides:             bundled(npm(is-symbol)) = 1.0.4
+Provides:             bundled(npm(is-weakmap)) = 2.0.1
+Provides:             bundled(npm(is-weakset)) = 2.0.2
+Provides:             bundled(npm(isarray)) = 2.0.5
+Provides:             bundled(npm(js-sha1)) = 0.6.0
+Provides:             bundled(npm(js-sha256)) = 0.9.0
+Provides:             bundled(npm(js-tokens)) = 4.0.0
+Provides:             bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.1
+Provides:             bundled(npm(lodash)) = 4.17.21
+Provides:             bundled(npm(loose-envify)) = 1.4.0
+Provides:             bundled(npm(object-assign)) = 4.1.1
+Provides:             bundled(npm(object-inspect)) = 1.12.3
+Provides:             bundled(npm(object-is)) = 1.1.5
+Provides:             bundled(npm(object-keys)) = 1.1.1
+Provides:             bundled(npm(object.assign)) = 4.1.4
+Provides:             bundled(npm(prop-types)) = 15.8.1
+Provides:             bundled(npm(react-dom)) = 18.2.0
+Provides:             bundled(npm(react-dropzone)) = 14.2.3
+Provides:             bundled(npm(react-is)) = 16.13.1
+Provides:             bundled(npm(react)) = 18.2.0
+Provides:             bundled(npm(regexp.prototype.flags)) = 1.5.0
+Provides:             bundled(npm(remarkable)) = 2.0.1
+Provides:             bundled(npm(scheduler)) = 0.23.0
+Provides:             bundled(npm(side-channel)) = 1.0.4
+Provides:             bundled(npm(sprintf-js)) = 1.0.3
+Provides:             bundled(npm(stop-iteration-iterator)) = 1.0.0
+Provides:             bundled(npm(tabbable)) = 6.2.0
+Provides:             bundled(npm(throttle-debounce)) = 2.3.0
+Provides:             bundled(npm(tslib)) = 2.6.2
+Provides:             bundled(npm(uuid)) = 7.0.3
+Provides:             bundled(npm(which-boxed-primitive)) = 1.0.2
+Provides:             bundled(npm(which-collection)) = 1.0.1
+Provides:             bundled(npm(which-typed-array)) = 1.1.11
+Provides:             bundled(npm(xterm-addon-canvas)) = 0.3.0
+Provides:             bundled(npm(xterm)) = 5.1.0
 
 %description system
 This package contains the Cockpit shell and system configuration interfaces.
@@ -508,7 +613,7 @@ fi
 test -f %{_bindir}/firewall-cmd && firewall-cmd --reload --quiet || true
 
 # check for deprecated PAM config
-if grep --color=auto pam_cockpit_cert %{_sysconfdir}/pam.d/cockpit; then
+if test -f %{_sysconfdir}/pam.d/cockpit &&  grep -q pam_cockpit_cert %{_sysconfdir}/pam.d/cockpit; then
     echo '**** WARNING:'
     echo '**** WARNING: pam_cockpit_cert is a no-op and will be removed in a'
     echo '**** WARNING: future release; remove it from your /etc/pam.d/cockpit.'
@@ -682,389 +787,760 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Thu Jan 25 2024 Release Engineering <releng@openela.org> - 286.1
+* Thu Jan 25 2024 Release Engineering <releng@openela.org> - 300.1
 - Remove recommends on subscription-manager-cockpit if applicable
 
-* Thu Feb 23 2023 Martin Pitt <mpitt@redhat.com> - 286.1-1
-- Users: Fix broken alignment of the first column in groups table
-- Translation updates (rhbz#2139715)
+* Thu Sep 07 2023 Martin Pitt <mpitt@redhat.com> - 300-1
+- Translation updates (rhbz#2189558)
 
-* Wed Feb 22 2023 Martin Pitt <mpitt@redhat.com> - 286-1
-- Metrics: control visibility of the resource usage graphs
+* Wed Sep 06 2023 Packit <hello@packit.dev> - 300-1
+- Celebrating the Nürnberg life release!
+- Storage: Support for growing block devices of a Stratis pool
 
-* Wed Feb 08 2023 Martin Pitt <mpitt@redhat.com> - 285-1
+* Wed Aug 23 2023 Packit <hello@packit.dev> - 299-1
+- Kdump: Show location of kdump to verify the successful configuration test
+- Storage: Support for no-overprovisioning with Stratis
+- Storage: Cockpit can now add caches to encrypted Stratis pools
+
+* Wed Jul 26 2023 Packit <hello@packit.dev> - 297-1
+- users: allow administrators to change the user shell
+- Enable Python bridge on Fedora 38 and CentOS/RHEL 9
+
+* Wed Jul 12 2023 Packit <hello@packit.dev> - 296-1
+- Performance and stability improvements
+
+* Wed Jun 28 2023 Packit <hello@packit.dev> - 295-1
+- Cockpit Client can now connect to servers without Cockpit installed
+
+* Thu Jun 15 2023 Python Maint <python-maint@redhat.com> - 294.1-2
+- Rebuilt for Python 3.12
+
+* Thu Jun 15 2023 Packit <hello@packit.dev> - 294.1-1
+- Multiple major fixes for the "remote python bridge" use case
+
+* Thu Jun 15 2023 Python Maint <python-maint@redhat.com> - 294-2
+- Rebuilt for Python 3.12
+
+* Wed Jun 14 2023 Packit <hello@packit.dev> - 294-1
+- Introduce Python bridge on Fedora Rawhide and Debian unstable
+
+* Thu Jun 01 2023 Packit <hello@packit.dev> - 293-1
+- Tests and code quality improvements
+
+* Tue May 16 2023 Packit <hello@packit.dev> - 292-1
+- Metrics: Add disk IO per service
+- Several right-to-left language fixes
+
+* Wed May 03 2023 Packit <hello@packit.dev> - 291-1
+- Update to PatternFly 5 Alpha
+
+* Wed Apr 19 2023 Packit <hello@packit.dev> - 290-1
+- Login page: Add autocomplete tags
+- webserver: Disallow direct URL logins with LoginTo=false
+
+* Wed Apr 05 2023 Packit <hello@packit.dev> - 289-1
+- Metrics: Indicate high usage and use colorblind-friendly colors
+- Accounts: Improve password validation
+
+* Fri Mar 24 2023 Packit <hello@packit.dev> - 288.1-1
+- Fix broken "SELinux" menu entry
+
+* Thu Mar 23 2023 Packit <hello@packit.dev> - 288-1
+- Accounts: Show shell and home directory on detail page
+- Accounts: Custom user ID during account creation
+- Overview: Support additional timeservers with chronyd
+- Metrics: Show longer time span by default
+- Storage: Mounting filesystems at boot time
+- Services: Units need to be re-pinned
+- API removal: Remove cockpit.dbus.publish() and .meta()
+- Development: Cockpit now supports the esbuild bundler
+
+* Thu Mar 09 2023 Packit <hello@packit.dev> - 287-1
+- Metrics: Column visiblity
+- Services: Pinned units need to be re-done
+
+* Wed Feb 22 2023 Packit <hello@packit.dev> - 286-1
+- Metrics page: control visibility of the resource usage graphs
+
+* Wed Feb 08 2023 Packit <hello@packit.dev> - 285-1
 - Cryptographic subpolicies support
 - users: Group creation and filtering support
 
-* Wed Jan 25 2023 Martin Pitt <mpitt@redhat.com> - 284-1
+* Wed Jan 25 2023 Packit <hello@packit.dev> - 284-1
 - Services: Show logs for user units
 - Storage: Set up a system to use NBDE
 
-* Wed Jan 11 2023 Katerina Koukiou <kkoukiou@redhat.com> - 283-1
+* Thu Jan 19 2023 Fedora Release Engineering <releng@fedoraproject.org> - 283-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_38_Mass_Rebuild
+
+* Wed Jan 11 2023 Packit <hello@packit.dev> - 283-1
 - Services: Create timer to run every minute
 
-* Wed Dec 14 2022 Katerina Koukiou <kkoukiou@redhat.com> - 282-1
+* Wed Dec 14 2022 Packit <hello@packit.dev> - 282-1
 - Add right-to-left language support
 - Accounts: Redesign and include groups
+
+
+* Thu Dec 01 2022 Packit <hello@packit.dev> - 281-1
 - Dark theme switcher
+
+
+* Thu Nov 24 2022 Packit <hello@packit.dev> - 280.1-1
+- Exclude kpatch test on RHEL gating
+
+
+* Wed Nov 16 2022 Packit <hello@packit.dev> - 280-1
 - tools: Disallow root login by default
 
-* Tue Nov 15 2022 Matej Marusak <mmarusak@redhat.com> - 279-1
+
+* Mon Nov 07 2022 Packit <hello@packit.dev> - 279-1
 - Dark theme support
+
+
+* Wed Oct 19 2022 Packit <hello@packit.dev> - 278-1
 - Metrics: Display individual disk read/write usage
 
-* Thu Aug 25 2022 Matej Marusak <mmarusak@redhat.com> - 275-1
-- shell: Support for alternatives to sudo (rhbz#2091034)
 
-* Thu Jul 21 2022 Martin Pitt <mpitt@redhat.com> - 273-2
-- Re-disable BaseOS package builds
+* Wed Sep 21 2022 Packit <hello@packit.dev> - 277-1
+- Performance and stability improvements
 
-* Thu Jul 21 2022 Martin Pitt <mpitt@redhat.com> - 273-1
- - Metrics: Display CPU temperature
- - Networking: Suggest netmask and gateway addresses
- - Software Updates: Optionally reboot after updating
- - cockpit/ws container: Support modern SSH keys
 
-* Wed Jun 29 2022 Martin Pitt <mpitt@redhat.com> - 272-2
-  - No-change rebuild due to brew confusion
+* Mon Sep 12 2022 Packit <hello@packit.dev> - 276.1-1
+ - login: Use valid selectors when testing for :is() / :where() support.
 
-* Thu Jun 23 2022 Matej Marusak <mmarusak@redhat.com> - 272-1
- - Firewall: Edit custom services
- - Services: Pin services as favorites
- - Login: Dark mode
 
-* Wed May 25 2022 Martin Pitt <mpitt@redhat.com> - 270-1
- - Services: User-created timer deletion
- - System Diagnostics: Working with diagnostic reports has been improved
+* Wed Sep 07 2022 Packit <hello@packit.dev> - 276-1
+ - Stability and performance improvements
 
-* Mon May 16 2022 Matej Marusak <mmarusak@redhat.com> - 269-1
- - Kdump: Show journal when service fails (rhbz#2062297)
- - Parse /proc/cpuinfo on s390x (rhbz#2069552)
- - bridge: Default "init-superuser" to "none" (rhbz#2071938)
- - Animate new rows in lists
- - Crypto policies support
- - Metrics: Show busiest CPU core
- - Metrics: Show Podman containers in top CPU and memory lists
- - Standardize on SI-based units for data sizes and rates
 
-* Fri Feb 25 2022 Martin Pitt <mpitt@redhat.com> - 264-1
- - Metrics: Improve layout on small resolutions
- - Networking: Fix checkpoint handling and IP settings dialog (rhbz#2056386)
- - Services: Show error message instead of eternal "Loading..." state
- - Accounts: Add override button to confirm weak password
- - Accounts: Fix parsing of "last login" date
+* Wed Aug 24 2022 Packit <hello@packit.dev> - 275-1
+- shell: Support for alternatives to sudo
 
-* Thu Feb 17 2022 Martin Pitt <mpitt@redhat.com> - 263-1
-- Overview: Show scheduled shutdowns
-- Networking: Add firewall service description
-- Shell: Fix browser history
 
-* Tue Jan 25 2022 Matej Marusak <mmarusak@redhat.com> - 261-1
-- shell: Allow adding keys with passphrase
+* Mon Aug 08 2022 Packit <hello@packit.dev> - 274.1-1
+- cockpit-client: Support WebKit 4.1 API
 
-* Tue Jan 04 2022 Martin Pitt <mpitt@redhat.com> - 260-1
-- Certificate login validation (rhbz#1992620, CVE-2021-3698)
+
+* Wed Aug 03 2022 Packit <hello@packit.dev> - 274-1
+- ws: Fix segfault with channel closing (#17492)
+- Services: Fix time picker behaviour in Timer creation dialog
+- Metrics: Improve CPU temperature sensors detection
+
+
+* Wed Jul 20 2022 Fedora Release Engineering <releng@fedoraproject.org> - 273-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
+
+* Wed Jul 20 2022 Packit <hello@packit.dev> - 273-1
+- Metrics: Display CPU temperature
+- Networking: Suggest netmask and gateway addresses
+- Software Updates: Optionally reboot after updating
+- cockpit/ws container: Support modern SSH keys
+
+
+* Thu Jun 23 2022 Packit <hello@packit.dev> - 272-1
+- Firewall: Edit custom services
+- Services: Pin services as favorites
+- Login: Dark mode
+- Unprivileged cockpit/ws container mode
+
+
+* Wed Jun 08 2022 Packit <hello@packit.dev> - 271-1
+- Tests improvements and stabilization
+
+
+* Tue May 24 2022 Packit <hello@packit.dev> - 270-1
+- Services: User-created timer deletion
+- System Diagnostics: Working with diagnostic reports has been improved
+
+
+* Thu May 12 2022 Cockpit Project <cockpituous@gmail.com> - 269-1
+- Update to upstream 269 release
+
+* Thu Apr 28 2022 Cockpit Project <cockpituous@gmail.com> - 268.1-1
+- Update to upstream 268.1 release
+
+* Thu Apr 28 2022 Cockpit Project <cockpituous@gmail.com> - 268-1
+- Update to upstream 268 release
+
+* Wed Apr 13 2022 Cockpit Project <cockpituous@gmail.com> - 267-1
+- Update to upstream 267 release
+
+* Wed Mar 30 2022 Cockpit Project <cockpituous@gmail.com> - 266-1
+- Update to upstream 266 release
+
+* Wed Mar 16 2022 Cockpit Project <cockpituous@gmail.com> - 265-1
+- Update to upstream 265 release
+
+* Fri Feb 25 2022 Cockpit Project <cockpituous@gmail.com> - 264-1
+- Update to upstream 264 release
+
+* Wed Feb 16 2022 Cockpit Project <cockpituous@gmail.com> - 263-1
+- Update to upstream 263 release
+
+* Wed Feb 02 2022 Cockpit Project <cockpituous@gmail.com> - 262-1
+- Update to upstream 262 release
+
+* Mon Jan 24 2022 Cockpit Project <cockpituous@gmail.com> - 261-1
+- Update to upstream 261 release
+
+* Wed Jan 19 2022 Fedora Release Engineering <releng@fedoraproject.org> - 260-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_36_Mass_Rebuild
+
+* Wed Jan 05 2022 Martin Pitt <mpitt@redhat.com> - 260-1
+- Certificate login validation: Action required on updates
 - Client: Show previously used hosts
 - Client: Support port specification
 - bridge: Warning on missing cockpit-system package
 
-* Mon Dec 13 2021 Martin Pitt <mpitt@redhat.com> - 259-1
-- Translation updates
+* Wed Dec 08 2021 Marius Vollmer <mvollmer@redhat.com> - 259-1
+- storage: More information in table rows
 
-* Thu Nov 25 2021 Martin Pitt <mpitt@redhat.com> - 258-1
+* Wed Nov 24 2021 Allison Karlitskaya <allison.karlitskaya@redhat.com> - 258-1
 - Tweak login screen UI
-- Fix SELinux policy installation
+- Use official VDO LVM API
+- Add cockpit-client, to be bundled as a flatpak
 
 * Wed Nov 10 2021 Katerina Koukiou <kkoukiou@redhat.com> - 257-1
 - Support for reading TLS certificates with any permissions
 - cockpit-ws no longer supports merged certificates
-- Services: Show user-owned systemd units (rhbz#1792270)
+- Services: Show user-owned systemd units
 
-* Thu Oct 14 2021 Martin Pitt <mpitt@redhat.com> - 255-1
-- Restrict frame embedding to same origin (rhbz#1984902, CVE-2021-3660)
-- kdump: Show "Directory" field for NFS mounts (rbhz#2004041)
+* Wed Oct 27 2021 Jelle van der Waa <jvanderwaa@redhat.com> - 256-1
+- Clean up old self-signed certificates
+- Storage: Add support for Stratis
 
-* Wed Aug 18 2021 Matej Marusak <mmarusak@redhat.com> - 251-1
-- Logs: Fix layout and add new filtering options (rhbz#1980207)
+* Fri Oct 15 2021 Martin Pitt <mpitt@redhat.com> - 255.1-1
+- Fix realmd join dialog crash if given address is not the domain name
+
+* Wed Oct 13 2021 Martin Pitt <mpitt@redhat.com> - 255-1
+- FreeIPA-issued webserver certificates get auto-renewed
+
+* Wed Sep 29 2021 Matej Marusak <mmarusak@redhat.com> - 254-1
+- Overview: Move last login to Health Card
+- Webserver: Restrict frame embedding to same origin
+- Login: Add Arch Linux branding
+- Users: Add login history
+
+* Wed Sep 15 2021 Katerina Koukiou <kkoukiou@redhat.com> - 253-1
+- SELinux: Dismiss multiple alerts
+
+* Wed Sep 01 2021 Simon Kobyda <skobyda@redhat.com> - 252-1
+- Webserver: Drop remotectl utility
+- Shell: Show package version in ‘About web console’ modal
+- Storage: Encryption is presented as a property of a Filesystem
+
+* Wed Aug 18 2021 Marius Vollmer <mvollmer@redhat.com> - 251-1
+- Update to upstream 251 release
 
 * Wed Aug 04 2021 Martin Pitt <mpitt@redhat.com> - 250-1
 - Shell: Improve admin switcher and session menu
-- Update Insights links to point to console.redhat.com (rhbz#1984841)
+- Software Updates: Introduce basic kpatch support
+
+* Wed Jul 21 2021 Fedora Release Engineering <releng@fedoraproject.org> - 249-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
 
 * Wed Jul 21 2021 Matej Marusak <mmarusak@redhat.com> - 249-1
+- storage: Content table improvements
 - common: Add Content-Type for wasm
 - all: Port away from Moment.js
 
-* Thu Jul 08 2021 Martin Pitt <mpitt@redhat.com> - 248-1
+* Wed Jul 07 2021 Allison Karlitskaya <allison.karlitskaya@redhat.com> - 248-1
 - Metrics: Install missing packages
-- PAM: Deprecate pam_cockpit_cert module
+- PAM: Deprecate `pam_cockpit_cert` module
+- Build system cleanups
 
 * Wed Jun 23 2021 Katerina Koukiou <kkoukiou@redhat.com> - 247-1
 - Metrics: Enable Grafana client setup
+- Machines: Share host files with the guest using virtio-fs
+- Machines: Show list of pass-through devices
 
-* Tue Jun 15 2021 Martin Pitt <mpitt@redhat.com> - 246-1
-- Metrics: New PCP configuration dialog
-- Polish of the Services page
+
+* Wed Jun 09 2021 Marius Vollmer <mvollmer@redhat.com> - 246-1
+- Improvements to the build system
+- Polish of the Services and Storage pages
 - Updated translations
 
-* Wed May 12 2021 Katerina Koukiou <kkoukiou@redhat.com> - 244.1-1
-- Shell: sudo is invoked only when explicitly requested
-- Dynamically manage motd/issue symlinks in package scripts (rhbz#1876848)
 
-* Mon Apr 19 2021 Matej Marusak <mmarusak@redhat.com> - 242-1
-- Network: Fix device connection button (rhbz#1946874)
-- Network: Fully show MAC dropdown in add bond dialog (rhbz#1946877)
+* Wed May 26 2021 Martin Pitt <mpitt@redhat.com> - 245-1
+- Metrics: New PCP configuration dialog
+- Storage: Show both SHA256 and SHA1 Tang fingerprints
+- Release: No more cockpit-cache tarball
+
+
+* Sun May 16 2021 Martin Pitt <mpitt@redhat.com> - 244.1-1
+- storage: use SHA256 for Tang fingerprints
+- testlib: Eliminate dataclass for RHEL/CentOS 8 compatibility
+
+
+* Wed May 12 2021 Katerina Koukiou <kkoukiou@redhat.com> - 244-1
+- Shell: sudo is invoked only when explicitly requested
+
+
+* Wed Apr 28 2021 Martin Pitt <mpitt@redhat.com> - 243-1
+- Services: Show sockets and memory usage
+- Developer API: Watch for file changes without reading
+
+
+* Wed Apr 14 2021 Matej Marusak <mmarusak@redhat.com> - 242-1
+- Support for pages built with snowpack
+- Machines: Split out to separate project
+
+
+* Wed Mar 31 2021 Simon Kobyda <skobyda@redhat.com> - 241-1
+- kdump: redesign the page
+
+
+* Wed Mar 17 2021 Marius Vollmer <mvollmer@redhat.com> - 240-1
+- New localization: Norwegian Bokmål
+- Performance metrics: Journal integration
+- Machines: support authentication against cloud images
+
+* Wed Mar 03 2021 Martin Pitt <mpitt@redhat.com> - 239-1
+- Terminal: Support for changing the font size
+- Machines: Allow editing disk cache mode
+- Logs: Link to related services page
+- SELinux: Restyle to resemble other pages
+- Packaging: Removed ./configure options for distribution specific packages
+
+
+* Tue Mar 02 2021 Zbigniew Jędrzejewski-Szmek <zbyszek@in.waw.pl> - 238.1-2
+- Rebuilt for updated systemd-rpm-macros
+  See https://pagure.io/fesco/issue/2583.
 
 * Mon Feb 22 2021 Martin Pitt <mpitt@redhat.com> - 238.1-1
 - Several UI alignment fixes
+- Updates: Show PackageKit errors properly
 - Re-drop unit tests from built packages
 - Metrics: Don't show swap column when no swap is present
 - Metrics: Don't show duplicate events
 
-* Wed Feb 17 2021 Martin Pitt <mpitt@redhat.com> - 238-1
+
+* Wed Feb 17 2021 Katerina Koukiou <kkoukiou@redhat.com> - 238-1
+- Updates: List outdated software that needs a restart
 - Web server: Preserve permissions of administrator-provided certificates
 - System: Performance page shows busiest CPU cores
+- Machines: VM disk creation supports a custom path
 
-* Fri Feb 05 2021 Martin Pitt <mpitt@redhat.com> - 237-1
+
+* Thu Feb 04 2021 Matej Marusak <mmarusak@redhat.com> - 237-1
+- Restyling updates page in preparation for upcoming features
 - SSH connections to remote machines are only opened when necessary
 
-* Fri Jan 22 2021 Matej Marusak <mmarusak@redhat.com> - 236-1
+
+* Tue Jan 26 2021 Fedora Release Engineering <releng@fedoraproject.org> - 236-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
+
+* Thu Jan 21 2021 Martin Pitt <mpitt@redhat.com> - 236-1
 - fslist channels: Include properties of changed files
 - Internal stabilization work
 
-* Fri Jan 08 2021 Martin Pitt <mpitt@redhat.com> - 235-1
+
+* Thu Jan 07 2021 Martin Pitt <mpitt@redhat.com> - 235-1
 - Login: Improved handling of SSH host keys
 - Overview: Editable motd
-- Adjust tests for sos 4.x to fix gating tests (rhbz#1895912)
 
-* Mon Dec 14 2020 Katerina Koukiou <kkoukiou@redhat.com> - 234-1
-- Improved login page
-- Improved bridge code after feedback from recent coverity scanning
 
-* Fri Nov 27 2020 Katerina Koukiou <kkoukiou@redht.com> - 233.1-1
-- Non-admin users no longer see Cockpit in motd (rhbz#1872562)
+* Wed Dec 09 2020 Marius Vollmer <mvollmer@redhat.com> - 234-1
+- machines: Allow editing VM's CPU mode and model
+- machines: Add support for cloning VMs
+- dashboard: So long
+
+* Thu Nov 26 2020 Katerina Koukiou <kkoukiou@redhat.com> - 233.1-1
+- Machines: Fix CSS regression on the VMs details page
+- One test fix for the metrics page
+
+
+* Thu Nov 26 2020 Cockpit Project <cockpituous@gmail.com> - 233-1
+- Update to upstream 233 release
+
+* Wed Nov 11 2020 Katerina Koukiou <kkoukiou@redhat.com> - 232-1
 - Improved host editing
+- Machines: Inline error messages
+
+
+* Thu Oct 29 2020 Matej Marusak <mmarusak@redhat.com> - 231-1
 - Replace system's graph page with a completely new USE method page
+- Machines: Reimplement the design of the main VMs list
 - Logging of remote IP addresses
-- shell: Any page can be the shell
-- Accounts: Allow setting weak passwords (rhbz#1652390)
-- Terminal: Fix issue with prompt not returning when clicking reset button in disoconnected session (rhbz#1897430)
 
-* Wed Aug 19 2020 Matej Marusak <mmarusak@redhat.com> - 224.2-1
-- lib: Include current directory in FileAutoComplete option listing (rhbz#1866995)
-- lib: Make sure that the expandable part of table rows has unique key (rhbz#1865821)
 
-* Wed Aug 05 2020 Matej Marusak <mmarusak@redhat.com> - 224.1-1
-- ws: Add key usage and constraints to self-signed server certificate (rhbz#1859812)
+* Wed Oct 14 2020 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 230-1
+- storage: List entries from /etc/crypttab that are still locked
 
-* Thu Jul 23 2020 Martin Pitt <mpitt@redhat.com> - 224-1
-- More translation updates (rhbz#1820538)
-- Some bug fixes on Services page
 
-* Thu Jul 09 2020 Martin Pitt <mpitt@redhat.com> - 223-1
+* Wed Sep 30 2020 Marius Vollmer <mvollmer@redhat.com> - 229-1
+-  shell: Any page can be the shell
+
+
+* Wed Sep 16 2020 Katerina Koukiou <kkoukiou@redhat.com> - 228-1
+- Accounts: Allow setting weak passwords
+- Changes to remote host logins
+- Machines: Add support for reverting and deleting VM snapshots
+- Drop cockpit-docker code
+
+
+* Wed Sep 02 2020 Martin Pitt <mpitt@redhat.com> - 227-1
+- Machines: Virtual machine list filtering
+- Continued PatternFly 4 migration
+
+
+* Wed Aug 19 2020 Marius Vollmer <mvollmer@redhat.com> - 226-1
+- Storage: Better support for "noauto" LUKS devices
+
+
+* Wed Aug 05 2020 Matej Marusak <mmarusak@redhat.com> - 225-1
+- machines: Add support for VM snapshots
+- developer API: Launch and reattach to a long-running process
+
+
+* Sat Aug 01 2020 Fedora Release Engineering <releng@fedoraproject.org> - 224-3
+- Second attempt - Rebuilt for
+  https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
+* Mon Jul 27 2020 Fedora Release Engineering <releng@fedoraproject.org> - 224-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
+* Wed Jul 22 2020 Katerina Koukiou <kkoukiou@redhat.com> - 224-1
+- machines/services: Multiple bug fixes
+
+
+* Wed Jul 08 2020 Katerina Koukiou <kkoukiou@redhat.com> - 223-1
 - Webserver: Standard-conformant lifetime of web server Certificate
-- Support certificate authentication against Active Directory
-- Fix cockpit-desktop privileges (rhbz#1841104)
-- Translation updates (rhbz#1820538)
+- Certificate authentication against Active Directory
+
 
 * Fri Jun 26 2020 Martin Pitt <mpitt@redhat.com> - 222.1-1
+- Machines: Fix crash on unset 'ui' property
 - Some integration test fixes for dist-git gating
 
-* Wed Jun 24 2020 Matej Marusak <mmarusak@redhat.com> - 222-1
+
+* Wed Jun 24 2020 Martin Pitt <mpitt@redhat.com> - 222-1
 - Logs: More flexible text filters
 - Services, Dashboard: Hide some buttons when access is limited
 - Webserver: Lock down cockpit.service privileges
-- Localization updates (rhbz#1820538)
+
 
 * Mon Jun 15 2020 Martin Pitt <mpitt@redhat.com> - 221.1-1
 - Put back missing base1/patternfly.css
 - Services: Don't offer 'Start Service' in Limited Access mode
 
-* Sun Jun 14 2020 Martin Pitt <mpitt@redhat.com> - 221-1
+
+* Wed Jun 10 2020 Marius Vollmer <mvollmer@redhat.com> - 221-1
 - Support for Cross-Origin-Resource-Policy
 - Accounts: Some buttons are hidden when access is limited
 - Developers: Importing "base1/patternfly.css" is deprecated
-- Translation updates (rhbz#1820538)
 
-* Thu May 28 2020 Matej Marusak <mmarusak@redhat.com> - 220-1
+
+* Wed May 27 2020 Matej Marusak <mmarusak@redhat.com> - 220-1
 - New navigation with integrated switching of hosts
 - Logs: Inline help for filtering
-- Fix cockpit-system AppStream dependency (rhbz#1838003)
+- Storage: Improve side panel on details page
 
-* Wed May 13 2020 Matej Marusak <mmarusak@redhat.com> - 219-1
-- Rebase to upstream version 219
-- Accept upper-case login names for ssh/polkit agent challenges (rhbz#1825749)
-- Show last/failed login (rhbz#1784772)
-- Modernize services page (rhbz#1791193)
-- Search in journal (rhbz#1710731)
-- The default mode is not consistent with the mode in the created bond (rhbz#1817948)
-- Fix deadlock in channel pressure handling (rhbz#1751783)
 
-* Thu Mar 12 2020 Martin Pitt <mpitt@redhat.com> - 211.3-1
-- Fix CJK translations (rhbz#1807856)
+* Wed May 13 2020 Katerina Koukiou <kkoukiou@redhat.com> - 219-1
+- Logs: Improved filtering
+- Gain or drop administrative access in a running Cockpit session
 
-* Mon Feb 24 2020 Martin Pitt <mpitt@redhat.com> - 211.2-2
-- Fix weak dependencies of cockpit/cockpit-system rhbz#1803858
 
-* Wed Feb 19 2020 Matej Marusak <mmarusak@redhat.com> - 211.2-1
-- Users: Fix reboot warnings of changed roles
-- Translation updates (rhbz#1754958)
-- Fix CPU mitigations to recognize kernel options at the beginning of line
+* Wed Apr 29 2020 Martin Pitt <mpitt@redhat.com> - 218-1
+- Services: Improved accessibility and mobile support
+- Overview: Add uptime information
+- Disable idle timeout by default
+- Support building without polkit
 
-* Sun Jan 26 2020 Martin Pitt <mpitt@redhat.com> - 211.1-1
 
+* Wed Apr 15 2020 Marius Vollmer <mvollmer@redhat.com> - 217-1
+- verview: more Insights details
+- ialogs: new button order
+- achines: sendings keys to VM consoles
+
+
+* Wed Apr 01 2020 sanne raymaekers <sanne.raymaekers@gmail.com> - 216-1
+- SELinux: Automatic application of solutions that set booleans
+- Machines: Drop virsh backend support
+- Overview: New “last login” banner
+
+
+* Wed Mar 18 2020 Katerina Koukiou <kkoukiou@redhat.com> - 215-1
+- Networking: Show additional ports for each firewall zone
+
+
+* Thu Mar 12 2020 Martin Pitt <mpitt@redhat.com> - 214.1-1
+- Updates: Fix unstyled button regression
+- Machines: Fix slow requests when enabling polkit access driver
+- Deprecate cockpit-docker for Fedora, Debian, and Ubuntu development series
+
+
+* Wed Mar 04 2020 Martin Pitt <mpitt@redhat.com> - 214-1
+- Networking: List Firewall active zones when unprivileged
+- Start Selenium tests deprecation
+
+
+* Wed Feb 19 2020 Marius Vollmer <mvollmer@redhat.com> - 213-1
+- Inline documentation
+- Support for transient virtual machines
+- UEFI for virtual machines
+- Unattended virtual machines installation
+
+
+* Wed Feb 05 2020 sanne raymaekers <sanne.raymaekers@gmail.com> - 212-1
+- Per page documentation
+- Localize times
+
+
+* Tue Jan 28 2020 Fedora Release Engineering <releng@fedoraproject.org> - 211.1-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
+
+* Sat Jan 25 2020 Martin Pitt <mpitt@redhat.com> - 211.1-1
 - system: Fix graph layout across all browsers (rhbz#1792623)
 - websocket: Fix unaligned access in send_prefixed_message_rfc6455()
 
-* Thu Jan 23 2020 Martin Pitt <mpitt@redhat.com> - 211-1
-- Fix HTTPS requests > 4 KiB (rhbz#1785509)
+
+* Wed Jan 22 2020 Martin Pitt <mpitt@redhat.com> - 211-1
 - Better support for various TLS certificate formats
 - Switch from Zanata to Weblate
 - Overview layout optimizations
-- Translation updates (rhbz#1754958)
 
-* Thu Jan 09 2020 Martin Pitt <mpitt@redhat.com> - 210-1
+
+* Wed Jan 08 2020 Katerina Koukiou <kkoukiou@redhat.com> - 210-1
 - Overview: Add CPU utilization to usage card
 - Dashboard: Support SSH identity unlocking when adding new machines
 - SElinux: Introduce an Ansible automation script
-- Translation updates (partially fixes rhbz#1754958)
+- Machines: Support “bridge” type network interfaces
+- Machines: Support “bus” type disk configuration
 
-* Mon Dec 16 2019 Matej Marusak <mmmarusak@redhat.com> - 209-2
-- Remove SELinux policy hack from spec file
 
-* Fri Dec 13 2019 Matej Marusak <mmmarusak@redhat.com> - 209-1
+* Fri Dec 13 2019 Marius Vollmer <mvollmer@redhat.com> - 209-1
 - New overview design
 - Session timeouts
 - Banners on login screen
 - Client certificate authentication
+- Support for Fedora CoreOS
 - Dropped support for pam_rhost
 
-* Thu Nov 28 2019 Matej Marusak <mmarusak@redhat.com> - 208-1
-- Fix SELinux policy update hack in %post
 
-* Thu Nov 14 2019 Matej Marusak <mmarusak@redhat.com> - 207-1
+* Wed Nov 27 2019 Martin Pitt <mpitt@redhat.com> - 208-1
+- Storage: Drop “default mount point” concept
+- Machines: Support transient virtual networks and storage pools
+- Machines: Sliders for disk size and memory in VM creation
+- Logs: Improve crash reporting
+
+
+* Wed Nov 13 2019 Katerina Koukiou <kkoukiou@redhat.com> - 207-1
 - Web server: Accept EC certificates
+- Storage: List all software devices in a single panel
 - Redesigned notifications
 
-* Wed Nov 13 2019 Martin Pitt <mpitt@redhat.com> - 206-1
-- Sync with Fedora 31, to get cockpit-tls prerequisite for upcoming Smart card
-  support
-- Logging in with SELinux-restricted user role now works (rhbz#1727382)
 
-* Fri Sep 13 2019 Martin Pitt <mpitt@redhat.com> - 196.3-1
-- systemd: Warn if not connected to Insights (rhbz#1745964)
+* Wed Oct 30 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 206-1
+- Machines: Network interface deletion
+- login: Enable administration mode by default
+- Firewall: Prevent accidental deletion
 
-* Tue Aug 13 2019 Martin Pitt <mpitt@redhat.com> - 196.2-1
-- firewall: Show any included services on a service (rhbz#1721548)
 
-* Thu Aug 01 2019 Martin Pitt <mpitt@redhat.com> - 196.1-1
-- networkmanager: Show correct IPv6 route metric in dialog (rhbz#1719575)
-- networkmanager: Ensure that endianess is always set (rhbz#1728213)
-- Update translations (rhbz#1689977)
+* Thu Oct 17 2019 Martin Pitt <mpitt@redhat.com> - 205.1-1
+- Fix web server slowness/crash bugs with TLS connections
 
-* Thu Jun 13 2019 Martin Pitt <mpitt@redhat.com> - 196-1
-- Networking: Add Firewall Zones configuration rhbz#1678473
-- Fix ssh login to unknown hosts rhbz#1701174
-- Fix login when ~/.bashrc prints to stdout rhbz#1716223
-- Much better On/Off buttons, also avoid text overlap rhbz#1677593
 
-* Sun May 05 2019 Martin Pitt <mpitt@redhat.com> - 193-1
-- Allow accounts with non-standard shells rhbz#1631905
-- Translation cleanup rhbz#1666722
+* Wed Oct 16 2019 Simon Kobyda <skobyda@redhat.com> - 205-1
+- Firewall: UI restructuring
+- Machines: Refactor Create VM dialog and introduce a download option
+- Adjust menu to PatternFly's current navigation design
+- Searching with keywords
+- Software Updates: Use notifications for available updates info
+- Web server security hardening
 
-* Thu Apr 04 2019 Martin Pitt <mpitt@redhat.com> - 191-1
-- System: Enable/disable SMT rhbz#1678956
-- Logs: Add service filtering rhbz#1657756
-- Networking: Add custom firewall ports rhbz#1660400
 
-* Wed Mar 13 2019 Martin Pitt <mpitt@redhat.com> - 189-1
-- Add search box to Services page rhbz#1657752
-- Connect to firewalld as superuser rhbz#1664158
-- Fix log filtering rhbz#1665421
-- Show error message for invalid IdM domain names rhbz#1659333
-- Changing passwords as root does not ask for current password rhbz#1666005
+* Wed Oct 02 2019 Martin Pitt <mpitt@redhat.com> - 204-1
+- System: Highlight failed services
+- Machines: Configure read-only and shareable disks
+- Playground: Add index page
 
-* Fri Feb 08 2019 Martin Pitt <mpitt@redhat.com> - 185-2
-- Fix polkit policy file translation attributes rhbz#1671773
 
-* Wed Jan 09 2019 Martin Pitt <mpitt@redhat.com> - 185-1
-- Update translations rhbz#1608292
+* Wed Sep 18 2019 Marius Vollmer <mvollmer@redhat.com> - 203-1
+- shell: Display message when websocket fails early
+- machines: Implement adding virtual network interfaces
+
+
+* Mon Sep 09 2019 Martin Pitt <mpitt@redhat.com> - 202.1-1
+- Fix major CSS regression on Logs and some other pages
+- Fix building on RHEL/CentOS 7
+
+
+* Wed Sep 04 2019 Katerina Koukiou <kkoukiou@redhat.com> - 202-1
+- Machines: Creation of Storage Volumes
+- Improved component for selecting paths on the filesystem
+
+
+* Wed Aug 21 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 201-1
+- Machines: VM creation and import dialog changes
+- Machines: Enable interface type "direct" in NIC configuration
+- systemd: Add more actions to services
+
+
+* Wed Aug 07 2019 Martin Pitt <mpitt@redhat.com> - 200-1
+- Machines: Type-ahead OS selection
+- Machines: LVM storage pools
+- Networking: Show included firewalld services
+- Web server: Split out TLS handling
+
+
+* Thu Jul 25 2019 Martin Pitt <mpitt@redhat.com> - 199-1
+- Redesigned logs all over cockpit
+- Services: Design and accesibility improvements
+- System: Show DIMM information on Hardware Info page
+- Machines: VM creation dialog now shows the recommended memory for the selected OS
+- cockpit-docker: Avoid file dependency (rhbz#1731686)
+
+
+* Wed Jul 24 2019 Fedora Release Engineering <releng@fedoraproject.org> - 198-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+
+* Wed Jul 10 2019 Martin Pitt <mpitt@redhat.com> - 198-1
+- PatternFly4 user interface design
+- SELinux: Show changes
+- Machines: Deletion of Virtual Networks
+- Machines: Support more disk types
+- Docker: Change menu label
+- Web server: More flexible https redirection for proxies
+
+
+* Wed May 15 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 194-1
+- Firewall: Add services to a specific zone
+- Redesigned on/off switch
+
+
+* Thu May 02 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 193-1
+- Machines: iSCSI direct storage pools
+- Storage: The "Format" button is no longer hidden
+- Storage: Improve performance with many block devices
+
+
+* Wed Apr 17 2019 Martin Pitt <mpitt@redhat.com> - 192-1
+- Machines: Auto-detect guest operating system
+- Translation cleanup
+- Allow accounts with non-standard shells
+
+
+* Wed Apr 03 2019 Marius Vollmer <mvollmer@redhat.com> - 191-1
+- Machines: iSCSI Storage pools
+- Machines: better notifications
+- System: CPU security mitigation
+- Network: Ports in the Firewall
+
+
+* Fri Mar 22 2019 Katerina Koukiou <kkoukiou@redhat.com> - 190-1
+- Logs: Filter log entries by service
+- Machines: Support for Pausing/Resuming VMs
+- Machines: Make Autostart property of a Virtual Network configurable
+- Machines: Support for creating VM with option to boot from PXE
+- Accessibility improvements
+
+
+* Wed Mar 06 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 189-1
+- Machines: Import existing image when creating VM
+- Machines: Introduce virtual networks
+- Services: Filtering of services by name, description, and state
+
+
+* Wed Feb 20 2019 Martin Pitt <mpitt@redhat.com> - 188-1
+- Machines: Show Storage Volume user
+- Machines: Autostart configuration
+- Terminal: Themes and context menu
+- Storage: Responsive dialogs
+- Software Updates: Show three most recent updates
+
+
+* Wed Feb 06 2019 Marius Vollmer <mvollmer@redhat.com> - 187-1
+- Machines: More operations for Storage Pools
+- Domains: More information about the joined domain
+- Storage: The options for VDO volumes are explained
+- Machines: Support for oVirt will be dropped in the future
+
+
+* Thu Jan 31 2019 Fedora Release Engineering <releng@fedoraproject.org> - 185-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
+
+* Wed Jan 16 2019 Björn Esser <besser82@fedoraproject.org> - 185-2
+- Rebuilt for libcrypt.so.2 (#1666033)
+
+* Wed Jan 09 2019 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 185-1
 - Responsive dialogs on network, kdump and users page
+- Kubernetes containers included in docker graphs
 
-* Fri Dec 14 2018 Martin Pitt <mpitt@redhat.com> - 184-1
-- Integration of Cockpit pages on the desktop rhbz#1651264
-- Fix crash in Simplified Chinese locale rhbz#1653544
-- Update screenshots in AppStream data rhbz#1656982
-- Update translations from Zanata rhbz#1608292
-- Improve login error message if cockpit-system is not installed rhbz#1650467
-- Mark deleted cookie as HttpOnly to pacify security scanners rhbz#1656441
 
-* Wed Nov 28 2018 Martin Pitt <mpitt@redhat.com> - 183-1
-- Kernel Dump: Support non-local targets rhbz#1651691
-- Fix firewall page oops when not selecting anything rhbz#1652207
-- Fix changing user's own password rhbz#1652304
-- Never send Content-Length with chunked encoding rhbz#1652511
-- Include "Web Console" in package description rhbz#1653617
+* Thu Dec 13 2018 Martin Pitt <martin@piware.de> - 184-1
+- Machines: Dialog and tab layout is now responsive
+- Storage: Filesystem labels are validated upfront
+- Storage: Some mount options are prefilled when needed
+- Integration of Cockpit pages on the desktop
+
+
+* Wed Nov 28 2018 Martin Pitt <martin@piware.de> - 183-1
+- Machines: Manage storage pools
+- Kernel Dump: Support non-local targets
 - Respect SSH configuration
+- Never send Content-Length with chunked encoding
 
-* Mon Nov 12 2018 Martin Pitt <mpitt@redhat.com> - 181-1
-- Fix key typing in file auto complete widget rhbz#1644195
-- Fix enabling firewalld rhbz#1646936
 
-* Fri Oct 12 2018 Martin Pitt <mpitt@redhat.com> - 180-1
-- Move to ssh SHA256 fingerprints rhbz#1637069
+* Wed Nov 14 2018 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 182-1
+- libvirt connection choice during VM creation
+- PackageKit page update severity tooltip
+- PackageKit page display registration status clearly
 
-* Thu Oct 04 2018 Martin Pitt <mpitt@redhat.com> - 179-1
-- Various crash fixes (coverity) rhbz#1635182
-- Updates for React 16 (for future backports) rhbz#1635182
-- Fix building with platform-python rhbz#1631174
 
-* Wed Sep 19 2018 Martin Pitt <mpitt@redhat.com> - 178-1
-- Fix remote unauthenticated crash with crafted URLs rhbz#1627634
-- Fix large downloads stalling after a few megabytes rhbz#1626847
-- Recommend system-logos to ensure correct branding rhbz#1626066
+* Wed Oct 31 2018 Marius Vollmer <mvollmer@redhat.com> - 181-1
+- Followup fixes related to the switch away from react-lite
+- Graph layout and color improvements
+- Machines: edit network interfaces
+- Update look of lists to match Patternfly
 
-* Wed Sep 05 2018 Martin Pitt <mpitt@redhat.com> - 177-1
-- Support centrally-managed SSH known hosts rhbz#1622835
-- Drop support for Internet Explorer rhbz#1619993
 
-* Thu Aug 23 2018 Martin Pitt <mpitt@redhat.com> - 176-1
-- Fix Cockpit activation message (/etc/issue.d) rhbz#1615316
-- Suggest other browsers when browser is unsupported rhbz#1619993
+* Fri Oct 12 2018 Martin Pitt <martin@piware.de> - 180-1
+- Move to ssh SHA256 fingerprints
+- Machines: Show error messages in the correct place
 
-* Tue Aug 21 2018 Martin Pitt <mpitt@redhat.com> - 175-2
-- Fix building against libssh 0.8  rhbz#1615508
 
-* Wed Aug 8 2018 Marius Vollmer <mvollmer@redhat.com> - 175-1
-- Storage: Network bound disk encryption
-- cockpit-ostree is now in its own source package
+* Thu Oct 04 2018 Sanne Raymaekers <sanne.raymaekers@gmail.com> - 179-1
+- Machines: Detach disk from VM with LibvirtDBus provider
+- Machines: Offer cockpit-machines as Application
 
-* Thu Aug 2 2018 Marius Vollmer <mvollmer@redhat.com> - 174-1
+* Wed Sep 19 2018 Marius Vollmer <mvollmer@redhat.com> - 178-1
+- Dropped support for KubeVirt
+
+
+* Wed Sep 05 2018 Martin Pitt <martin@piware.de> - 177-1
+- Storage: Support LUKS v2
+- Support centrally-managed SSH known hosts
+- Drop support for Internet Explorer
+
+
+* Wed Aug 08 2018 Marius Vollmer <mvollmer@redhat.com> - 175-1
+- Network bound disk encryption
+
+
+* Wed Aug 01 2018 Marius Vollmer <mvollmer@redhat.com> - 174-1
 - Kubernetes: VM detail page
 - Realmd: Install on demand
-- firewalld service is now being dropped by upstream
-- iscsi works fully now
 
-* Wed Jul 25 2018 Martin Pitt <mpitt@redhat.com> - 173-1
+
+* Tue Jul 31 2018 Florian Weimer <fweimer@redhat.com> - 173-3
+- Rebuild with fixed binutils
+
+* Sat Jul 28 2018 Martin Pitt <martin@piware.de> - 173-2
+- Drop firewalld service (moved to firewalld), add corresponding conflict
+  rhbz#1609393
+- Fix CI pipeline tests
+
+* Wed Jul 25 2018 Martin Pitt <martin@piware.de> - 173-1
 - Storage: Offer installation of VDO
 - Machines: Add disks to a virtual machine
 
-* Wed Jul 11 2018 Martin Pitt <mpitt@redhat.com> - 172-1
-- System: Offer installation of PCP
-- Software Updates: Improve layout in mobile mode
-- Remove ability to drop privileges from navigation bar
-- API: Introduce flow control for all channels
-- Python 3 support rhbz#1561472
 
-* Tue Jul 10 2018 Martin Pitt <mpitt@redhat.com> - 171-3
-- Really fix tests
-
-* Mon Jul 09 2018 Martin Pitt <mpitt@redhat.com> - 171-2
-- Fix tests
-- Drop firewalld service, add corresponding conflict
+* Thu Jul 12 2018 Fedora Release Engineering <releng@fedoraproject.org> - 171-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
 
 * Wed Jun 27 2018 Martin Pitt <martin@piware.de> - 171-1
-
 - Machines: Add virtual CPU configuration
 - Kubernetes: Add KubeVirt pod metrics
 - Docker: Show container volumes
@@ -1073,43 +1549,34 @@ via PackageKit.
 - Accounts: User role improvements
 - Localize times
 
-* Wed Jun 13 2018 Martin Pitt <martin@piware.de> - 170-1
 
+* Wed Jun 13 2018 Martin Pitt <martin@piware.de> - 170-1
 - Software Updates: Layout rework
 - oVirt: Use authenticated libvirt connection by default
-- Disable optional packages, they moved to cockpit-appstream source
-- Drop dashboard recommends from metapackage, not RHEL ready yet
 
-* Wed May 30 2018 Martin Pitt <martin@piware.de> - 169-1
-
-- Storage: Offer installation of NFS client support
-- System: Request FreeIPA SSL certificate for Cockpit's web server
-- Services: Show unit relationships
-- Provide motd help about how to access cockpit
 
 * Wed May 16 2018 Martin Pitt <martin@piware.de> - 168-1
-
 - Improve checks for root privilege availability
 
-* Wed May 02 2018 Martin Pitt <martin@piware.de> - 167-1
 
+* Wed May 02 2018 Martin Pitt <martin@piware.de> - 167-1
 - Networking: Add Firewall Configuration
 - Kubernetes: Show Kubevirt Registry Disks
 
-* Wed Apr 18 2018 Martin Pitt <martin@piware.de> - 166-1
 
+* Wed Apr 18 2018 Martin Pitt <martin@piware.de> - 166-1
 - Kubernetes: Add creation of Virtual Machines
 - Realms: Automatically set up Kerberos keytab for Cockpit web server
 - Numbers now get formatted correctly for the selected language
 
-* Wed Apr 04 2018 Martin Pitt <martin@piware.de> - 165-1
 
+* Wed Apr 04 2018 Martin Pitt <martin@piware.de> - 165-1
 - Storage: Show more details of sessions and services that keep NFS busy
 - Machines: Detect if libvirtd is not running
 - Machines: Show virtual machines that are being created
 
-* Wed Mar 21 2018 Martin Pitt <martin@piware.de> - 164-1
 
+* Wed Mar 21 2018 Martin Pitt <martin@piware.de> - 164-1
 - Storage: Move NFS management into new details page
 - System: Show available package updates and missing registration
 - System: Fix inconsistent tooltips
@@ -1118,17 +1585,17 @@ via PackageKit.
 - Accessibility improvements
 - Reloading the page in the browser now reloads Cockpit package manifests
 
-* Wed Mar 07 2018 Martin Pitt <martin@piware.de> - 163-1
 
+* Wed Mar 07 2018 Martin Pitt <martin@piware.de> - 163-1
 - Drop "Transfer data asynchronously" VDO option on Storage page
 - Hide Docker storage pool reset button when it cannot work properly
 - Update jQuery to version 3.3.1 (deprecated cockpit API!)
+
 
 * Fri Feb 09 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 161-2
 - Escape macros in %%changelog
 
 * Wed Feb 07 2018 Martin Pitt <martin@piware.de> - 161-1
-
 - New VMs can be created on Machines page
 - VMs running in Kubernetes can now be deleted
 - Improve LVM volume resizing
@@ -1137,11 +1604,11 @@ via PackageKit.
 - Rename cockpit-ovirt package to cockpit-machines-ovirt
 - Stop advertising and supporting cockpit-bundled jQuery library
 
+
 * Wed Feb 07 2018 Fedora Release Engineering <releng@fedoraproject.org> - 160-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_28_Mass_Rebuild
 
 * Wed Jan 24 2018 Martin Pitt <martin@piware.de> - 160-1
-
 - Add kubevirt Virtual Machines overview
 - Redesign package list on Software Updates page and show RHEL Errata
 - Install AppStream collection metadata packages on demand on Apps page
@@ -1150,73 +1617,74 @@ via PackageKit.
 - Show storage, network, and other numbers with 3 digits of precision
 - Add an example bastion container
 
+
 * Sat Jan 20 2018 Björn Esser <besser82@fedoraproject.org> - 159-2
 - Rebuilt for switch to libxcrypt
 
 * Wed Jan 10 2018 Martin Pitt <martin@piware.de> - 159-1
-
 - Configure data deduplication with VDO devices on Storage page
 - Add serial console to virtual Machines page and redesign the Consoles tab
 - Show more error message details for failures on virtual Machines page
 
-* Wed Dec 13 2017 Martin Pitt <martin@piware.de> - 158-1
 
+* Wed Dec 13 2017 Martin Pitt <martin@piware.de> - 158-1
 - Add check boxes for common NFS mount options
 - Clarify Software Update status if only security updates are available
 - Create self-signed certificates with SubjectAltName
 
-* Thu Nov 30 2017 Martin Pitt <martin@piware.de> - 157-1
 
+* Thu Nov 30 2017 Martin Pitt <martin@piware.de> - 157-1
 - Add Networks tab to overview on Machines page
 - The Apps page now displays SVG app icons
 
-* Thu Nov 16 2017 Martin Pitt <martin@piware.de> - 156-1
 
+* Thu Nov 16 2017 Martin Pitt <martin@piware.de> - 156-1
 - Redesign navigation and support mobile browsing
 - Use /etc/cockpit/krb5.keytab if present to support alternate keytabs
 - Add project homepage link to Apps page
 - Maintain issue(5) file with current Cockpit status
 - Use event-driven refresh of oVirt data instead of polling
 
-* Tue Nov 07 2017 Martin Pitt <martin@piware.de> - 155-1
 
+* Tue Nov 07 2017 Martin Pitt <martin@piware.de> - 155-1
 - Add NFS client support to the Storage page
 - Add "Maintenance" switch for oVirt hosts
 - Fix Terminal rendering issues in Chrome
 - Prevent closing Terminal with Ctrl+W when focused
 - Support the upcoming OpenShift 3.7 release
 
-* Wed Oct 18 2017 Martin Pitt <martin@piware.de> - 154-1
 
+* Wed Oct 18 2017 Martin Pitt <martin@piware.de> - 154-1
 - Center the "Disconnected" message in the content area
 - Fix two layout regressions on the Cluster page
 - Remove long-obsolete "./configure --branding" option
 
-* Tue Oct 17 2017 Martin Pitt <martin@piware.de> - 153-1
 
+* Tue Oct 17 2017 Martin Pitt <martin@piware.de> - 153-1
 - Add cockpit-ovirt package to control oVirt virtual machine clusters
 - Clean up rpmlint/lintian errors in the packages
 
-* Fri Oct 06 2017 Martin Pitt <martin@piware.de> - 152-1
 
+* Fri Oct 06 2017 Martin Pitt <martin@piware.de> - 152-1
 - Add Applications page
 - Add automatic update configuration for dnf to Software Updates
 - Fix cockpit-bridge crash if /etc/os-release does not exist
+
 
 * Mon Sep 25 2017 Stef Walter <stefw@redhat.com> - 151-2
 - Add simulated test failure
 
 * Thu Sep 21 2017 Martin Pitt <martin@piware.de> - 151-1
-
 - Support loading SSH keys from arbitrary paths
 - Support X-Forwarded-Proto HTTP header for Kubernetes
 - Fix Kubernetes connection hangs (regression in version 150)
 
-* Fri Sep 08 2017 Martin Pitt <martin@piware.de> - 150-1
 
+* Fri Sep 08 2017 Martin Pitt <martin@piware.de> - 150-1
 - Automatically enable and start newly created timers on the Services page
 - Support cockpit-dashboard installation into OSTree overlay on Atomic
 - Support Kubernetes basic auth with Google Compute Engine 1.7.x
+
 
 * Mon Aug 21 2017 petervo <petervo@redhat.com> - 149-1
 - Support sending non-maskable interrupt to VMs
@@ -1231,15 +1699,14 @@ via PackageKit.
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Mass_Rebuild
 
 * Fri Jul 21 2017 Martin Pitt <martin@piware.de> - 146-1
-
 - Show recent updates and live update log on Software Updates page
 - Improve available Software Updates table layout for small/mobile screens
 - Support OAuth Kubernetes logins to work with Google Compute Engine
 - Fix reporting ABRT crashes that are already known to the server
 - Scroll the virtual machine VNC console into view automatically
 
-* Fri Jul 07 2017 Martin Pitt <martin@piware.de> - 145-1
 
+* Fri Jul 07 2017 Martin Pitt <martin@piware.de> - 145-1
 - Resize the terminal dynamically to use all available space
 - Let the Machines page update immediately after changes
 - Add delete VM functionality to the Machines page
@@ -1248,26 +1715,27 @@ via PackageKit.
 - Group D-Bus channels to avoid hitting connection limits
 - Fix building on Fedora Rawhide/glibc 2.25.90
 
-* Mon Jun 19 2017 Martin Pitt <<martin@piware.de>> - 143-1
 
+* Mon Jun 19 2017 Martin Pitt <<martin@piware.de>> - 143-1
 - Add "Software Updates" page for package (rpm/deb) based operating systems
 - Fix cockpit-machines package to make inline VNC console actually work
 - Fix Kubernetes authentication when Kubernetes configured for RBAC
 - Build Docker page for s390x architecture
 
-* Fri Jun 09 2017 Martin Pitt <<martin@piware.de>> - 142-1
 
+* Fri Jun 09 2017 Martin Pitt <<martin@piware.de>> - 142-1
 - Virtual machines display an interactive console, either in browser, or a popup viewer
 - Fix Virtual Machines operations on non-English locales
 - Add documentation explaining how to grant/restrict access via polkit rules
 
-* Fri Apr 21 2017 Martin Pitt <<mpitt@redhat.com>> - 139-1
 
+* Fri Apr 21 2017 Martin Pitt <<mpitt@redhat.com>> - 139-1
 - Show more information about virtual machines, such as boot order
 - Fix enablement of timer systemd units created on Services page
 - Fix Storage crash on multiple iSCSI sessions
 - cockpit-docker is now installable with docker-ce or other alternatives
 - Hide docker push commands on Registry image pages for  "pull" roles
+
 
 * Mon Apr 10 2017 Stef Walter <<stefw@redhat.com>> - 138-1
 - Only allow mdraid disk removal when it won't destroy data
@@ -1275,15 +1743,14 @@ via PackageKit.
 - Simplify protocol that cockpit talks to session authentication processes
 
 * Thu Mar 30 2017 Martin Pitt <<mpitt@redhat.com>> - 137-1
-
 - Read ~/.ssh/known_hosts for connecting to remote machines with ssh
 - The Storage LVM setup can add unpartitioned free space as a physical volume
 - NetworkManager's Team plugin can be used on architectures other than x86_64
 - Cockpit's web server understands and properly responds to HTTP HEAD requests
 - Allow parameter substitution in manifest when spawning peer bridges
 
-* Thu Mar 09 2017 Martin Pitt <<mpitt@redhat.com>> - 134-1
 
+* Thu Mar 09 2017 Martin Pitt <<mpitt@redhat.com>> - 134-1
 - Show /etc/motd in the "System" task page
 - Drop "System" service actions which are intended for scripts
 - Make login page translatable
@@ -1291,16 +1758,16 @@ via PackageKit.
 - Add call timeout option to the cockpit.dbus() API
 - The Debian packaging is now able to apply binary patches
 
-* Thu Mar 02 2017 Martin Pitt <<mpitt@redhat.com>> - 133-1
 
+* Thu Mar 02 2017 Martin Pitt <<mpitt@redhat.com>> - 133-1
 - Remotely managed machines are now configured in /etc/cockpit/machines.d/*.json
 - Fix NetworkManager's "MTU" dialog layout
 - Build the cockpit-tests package for releases too
 - Split translations into individual packages
 - Packages now configure alternate cockpit-bridge's to interact with the system
 
-* Thu Feb 23 2017 Martin Pitt <<mpitt@redhat.com>> - 132-1
 
+* Thu Feb 23 2017 Martin Pitt <<mpitt@redhat.com>> - 132-1
 - Make basic SELinux functionality available without setroubleshootd
 - Allow changing the MAC address for ethernet adapters and see them for bonds
 - Hide "autoconnect" checkbox for network devices without settings
@@ -1311,6 +1778,7 @@ via PackageKit.
 - Rename cockpit-test-assets package to cockpit-tests
 - When touching patched files handle case of only one file
 - Always build the cockpit-tests subpackage
+
 
 * Mon Feb 06 2017 Stef Walter <<stefw@redhat.com>> - 131-1
 - Show session virtual machines on Machines page
