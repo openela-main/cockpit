@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              300.1
+Version:              300.3
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 
@@ -104,7 +104,7 @@ BuildRequires:        pam-devel
 
 BuildRequires:        autoconf automake
 BuildRequires:        make
-BuildRequires:        /usr/bin/python3
+BuildRequires:        python3-devel
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # RHEL 8's gettext does not yet have metainfo.its
 BuildRequires:        gettext >= 0.19.7
@@ -783,8 +783,17 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Thu Jan 25 2024 Release Engineering <releng@openela.org> - 300.1
+* Tue Mar 05 2024 Release Engineering <releng@openela.org> - 300.3
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Wed Sep 27 2023 Martin Pitt <mpitt@redhat.com> - 300.3-1
+- Fix crash with large file uploads (RHEL-5341)
+- Fix connecting to older bridges, in particular RHEL 8 (RHEL-3537)
+
+* Thu Sep 21 2023 Martin Pitt <mpitt@redhat.com> - 300.2-1
+- Keep administrative access after a page reload (RHEL-5765)
+- spec: Move to BuildRequires: python3-devel (RHEL-2215)
+- Lots of test stabilizations
 
 * Thu Sep 07 2023 Martin Pitt <mpitt@redhat.com> - 300.1-1
 - Translation updates (rhbz#2189499)
