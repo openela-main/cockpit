@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              300.3
+Version:              300.4
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 
@@ -783,8 +783,13 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue Mar 05 2024 Release Engineering <releng@openela.org> - 300.3
+* Thu Mar 14 2024 Release Engineering <releng@openela.org> - 300.4
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Mon Dec 18 2023 Martin Pitt <mpitt@redhat.com> - 300.4-1
+- client: Provide fallback for GLib.get_user_state_dir() (RHEL-18989)
+- bridge: Add back menu/tool names to cockpit-bridge --packages (RHEL-19004)
+- bridge: Add back support for x.min.js files (RHEL-19005)
 
 * Wed Sep 27 2023 Martin Pitt <mpitt@redhat.com> - 300.3-1
 - Fix crash with large file uploads (RHEL-5341)
