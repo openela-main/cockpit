@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              310.3
+Version:              310.4
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              cockpit.css.gz
@@ -787,8 +787,12 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Wed May 22 2024 Release Engineering <releng@openela.org> - 310.3
+* Thu Jun 06 2024 Release Engineering <releng@openela.org> - 310.4
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Tue Apr 02 2024 Martin Pitt <mpitt@redhat.com> - 310.4-1
+- sosreport: Fix command injection with crafted report names [CVE-2024-2947]
+  (jira#RHEL-30452)
 
 * Thu Feb 15 2024 Martin Pitt <mpitt@redhat.com> - 310.3-1
 - Translation updates (jira#RHEL-16681)
