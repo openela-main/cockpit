@@ -12,7 +12,7 @@
 # Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public License
-# along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
+# along with Cockpit; If not, see <https://www.gnu.org/licenses/>.
 #
 
 # This file is maintained at the following location:
@@ -49,17 +49,26 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              311.2
+Version:              323.1
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 
 
-# pcp stopped building on ix86
+%if 0%{?fedora} >= 41 || 0%{?rhel}
+ExcludeArch:          %{ix86}
+%endif
+
+# pcp stopped building on ix86 in Fedora 40+, and broke hard on 39: https://bugzilla.redhat.com/show_bug.cgi?id=2284431
 %define build_pcp 1
-%if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
+%if 0%{?fedora} >= 39 || 0%{?rhel} >= 10
 %ifarch %ix86
 %define build_pcp 0
 %endif
+%endif
+
+%define enable_multihost 1
+%if 0%{?fedora} >= 41 || 0%{?rhel} >= 10
+%define enable_multihost 0
 %endif
 
 # Ship custom SELinux policy
@@ -139,7 +148,7 @@ Requires:             subscription-manager-cockpit
 
 BuildRequires:        python3-devel
 BuildRequires:        python3-pip
-%if 0%{?rhel} == 0
+%if 0%{?rhel} == 0 && !0%{?suse_version}
 # All of these are only required for running pytest (which we only do on Fedora)
 BuildRequires:        procps-ng
 BuildRequires:        pyproject-rpm-macros
@@ -155,14 +164,15 @@ BuildRequires:        python3-tox-current-env
 %build
 %configure \
     %{?selinux_configure_arg} \
-    --with-cockpit-user=cockpit-ws \
-    --with-cockpit-ws-instance-user=cockpit-wsinstance \
 %if 0%{?suse_version}
     --docdir=%_defaultdocdir/%{name} \
 %endif
     --with-pamdir='%{pamdir}' \
 %if %{build_pcp} == 0
     --disable-pcp \
+%endif
+%if %{enable_multihost}
+    --enable-multihost \
 %endif
 
 %make_build
@@ -331,11 +341,11 @@ Provides:             cockpit-users = %{version}-%{release}
 Obsoletes:            cockpit-dashboard < %{version}-%{release}
 %if 0%{?rhel}
 Requires:             NetworkManager >= 1.6
-Requires:             kexec-tools
 Requires:             sos
 Requires:             sudo
 Recommends:           PackageKit
 Recommends:           setroubleshoot-server >= 3.3.3
+Recommends:           /usr/bin/kdumpctl
 Suggests:             NetworkManager-team
 Provides:             cockpit-kdump = %{version}-%{release}
 Provides:             cockpit-networkmanager = %{version}-%{release}
@@ -346,55 +356,20 @@ Provides:             cockpit-sosreport = %{version}-%{release}
 Recommends:           (reportd if abrt)
 %endif
 
-Provides:             bundled(npm(@patternfly/patternfly)) = 5.1.0
-Provides:             bundled(npm(@patternfly/react-core)) = 5.1.2
-Provides:             bundled(npm(@patternfly/react-icons)) = 5.1.2
-Provides:             bundled(npm(@patternfly/react-styles)) = 5.1.2
-Provides:             bundled(npm(@patternfly/react-table)) = 5.1.2
-Provides:             bundled(npm(@patternfly/react-tokens)) = 5.1.2
+Provides:             bundled(npm(@patternfly/patternfly)) = 5.3.1
+Provides:             bundled(npm(@patternfly/react-core)) = 5.3.4
+Provides:             bundled(npm(@patternfly/react-icons)) = 5.3.2
+Provides:             bundled(npm(@patternfly/react-styles)) = 5.3.1
+Provides:             bundled(npm(@patternfly/react-table)) = 5.3.4
+Provides:             bundled(npm(@patternfly/react-tokens)) = 5.3.1
+Provides:             bundled(npm(@xterm/addon-canvas)) = 0.7.0
+Provides:             bundled(npm(@xterm/xterm)) = 5.5.0
 Provides:             bundled(npm(argparse)) = 1.0.10
-Provides:             bundled(npm(array-buffer-byte-length)) = 1.0.1
 Provides:             bundled(npm(attr-accept)) = 2.2.2
 Provides:             bundled(npm(autolinker)) = 3.16.2
-Provides:             bundled(npm(available-typed-arrays)) = 1.0.6
-Provides:             bundled(npm(call-bind)) = 1.0.7
-Provides:             bundled(npm(date-fns)) = 3.3.1
-Provides:             bundled(npm(deep-equal)) = 2.2.3
-Provides:             bundled(npm(define-data-property)) = 1.1.4
-Provides:             bundled(npm(define-properties)) = 1.2.1
-Provides:             bundled(npm(es-define-property)) = 1.0.0
-Provides:             bundled(npm(es-errors)) = 1.3.0
-Provides:             bundled(npm(es-get-iterator)) = 1.1.3
+Provides:             bundled(npm(dequal)) = 2.0.3
 Provides:             bundled(npm(file-selector)) = 0.6.0
 Provides:             bundled(npm(focus-trap)) = 7.5.2
-Provides:             bundled(npm(for-each)) = 0.3.3
-Provides:             bundled(npm(function-bind)) = 1.1.2
-Provides:             bundled(npm(functions-have-names)) = 1.2.3
-Provides:             bundled(npm(get-intrinsic)) = 1.2.4
-Provides:             bundled(npm(gopd)) = 1.0.1
-Provides:             bundled(npm(has-bigints)) = 1.0.2
-Provides:             bundled(npm(has-property-descriptors)) = 1.0.2
-Provides:             bundled(npm(has-proto)) = 1.0.1
-Provides:             bundled(npm(has-symbols)) = 1.0.3
-Provides:             bundled(npm(has-tostringtag)) = 1.0.2
-Provides:             bundled(npm(hasown)) = 2.0.1
-Provides:             bundled(npm(internal-slot)) = 1.0.7
-Provides:             bundled(npm(is-arguments)) = 1.1.1
-Provides:             bundled(npm(is-array-buffer)) = 3.0.4
-Provides:             bundled(npm(is-bigint)) = 1.0.4
-Provides:             bundled(npm(is-boolean-object)) = 1.1.2
-Provides:             bundled(npm(is-callable)) = 1.2.7
-Provides:             bundled(npm(is-date-object)) = 1.0.5
-Provides:             bundled(npm(is-map)) = 2.0.2
-Provides:             bundled(npm(is-number-object)) = 1.0.7
-Provides:             bundled(npm(is-regex)) = 1.1.4
-Provides:             bundled(npm(is-set)) = 2.0.2
-Provides:             bundled(npm(is-shared-array-buffer)) = 1.0.2
-Provides:             bundled(npm(is-string)) = 1.0.7
-Provides:             bundled(npm(is-symbol)) = 1.0.4
-Provides:             bundled(npm(is-weakmap)) = 2.0.1
-Provides:             bundled(npm(is-weakset)) = 2.0.2
-Provides:             bundled(npm(isarray)) = 2.0.5
 Provides:             bundled(npm(js-sha1)) = 0.7.0
 Provides:             bundled(npm(js-sha256)) = 0.11.0
 Provides:             bundled(npm(js-tokens)) = 4.0.0
@@ -402,32 +377,18 @@ Provides:             bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.
 Provides:             bundled(npm(lodash)) = 4.17.21
 Provides:             bundled(npm(loose-envify)) = 1.4.0
 Provides:             bundled(npm(object-assign)) = 4.1.1
-Provides:             bundled(npm(object-inspect)) = 1.13.1
-Provides:             bundled(npm(object-is)) = 1.1.5
-Provides:             bundled(npm(object-keys)) = 1.1.1
-Provides:             bundled(npm(object.assign)) = 4.1.5
 Provides:             bundled(npm(prop-types)) = 15.8.1
-Provides:             bundled(npm(react-dom)) = 18.2.0
+Provides:             bundled(npm(react-dom)) = 18.3.1
 Provides:             bundled(npm(react-dropzone)) = 14.2.3
 Provides:             bundled(npm(react-is)) = 16.13.1
-Provides:             bundled(npm(react)) = 18.2.0
-Provides:             bundled(npm(regexp.prototype.flags)) = 1.5.2
+Provides:             bundled(npm(react)) = 18.3.1
 Provides:             bundled(npm(remarkable)) = 2.0.1
-Provides:             bundled(npm(scheduler)) = 0.23.0
-Provides:             bundled(npm(set-function-length)) = 1.2.1
-Provides:             bundled(npm(set-function-name)) = 2.0.1
-Provides:             bundled(npm(side-channel)) = 1.0.5
+Provides:             bundled(npm(scheduler)) = 0.23.2
 Provides:             bundled(npm(sprintf-js)) = 1.0.3
-Provides:             bundled(npm(stop-iteration-iterator)) = 1.0.0
 Provides:             bundled(npm(tabbable)) = 6.2.0
-Provides:             bundled(npm(throttle-debounce)) = 5.0.0
-Provides:             bundled(npm(tslib)) = 2.6.2
-Provides:             bundled(npm(uuid)) = 9.0.1
-Provides:             bundled(npm(which-boxed-primitive)) = 1.0.2
-Provides:             bundled(npm(which-collection)) = 1.0.1
-Provides:             bundled(npm(which-typed-array)) = 1.1.14
-Provides:             bundled(npm(xterm-addon-canvas)) = 0.5.0
-Provides:             bundled(npm(xterm)) = 5.3.0
+Provides:             bundled(npm(throttle-debounce)) = 5.0.2
+Provides:             bundled(npm(tslib)) = 2.6.3
+Provides:             bundled(npm(uuid)) = 10.0.0
 
 %description system
 This package contains the Cockpit shell and system configuration interfaces.
@@ -477,6 +438,7 @@ authentication via sssd/FreeIPA.
 %{_unitdir}/cockpit.service
 %{_unitdir}/cockpit-motd.service
 %{_unitdir}/cockpit.socket
+%{_unitdir}/cockpit-ws-user.service
 %{_unitdir}/cockpit-wsinstance-http.socket
 %{_unitdir}/cockpit-wsinstance-http.service
 %{_unitdir}/cockpit-wsinstance-https-factory.socket
@@ -484,7 +446,8 @@ authentication via sssd/FreeIPA.
 %{_unitdir}/cockpit-wsinstance-https@.socket
 %{_unitdir}/cockpit-wsinstance-https@.service
 %{_unitdir}/system-cockpithttps.slice
-%{_prefix}/%{__lib}/tmpfiles.d/cockpit-tempfiles.conf
+%{_prefix}/%{__lib}/tmpfiles.d/cockpit-ws.conf
+%{_sysusersdir}/cockpit-wsinstance.conf
 %{pamdir}/pam_ssh_add.so
 %{pamdir}/pam_cockpit_cert.so
 %{_libexecdir}/cockpit-ws
@@ -503,8 +466,8 @@ authentication via sssd/FreeIPA.
 %ghost %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{name}
 
 %pre ws
-getent group cockpit-ws >/dev/null || groupadd -r cockpit-ws
-getent passwd cockpit-ws >/dev/null || useradd -r -g cockpit-ws -d /nonexisting -s /sbin/nologin -c "User for cockpit web service" cockpit-ws
+# HACK: old RPM and even Fedora's current RPM don't properly support sysusers
+# https://github.com/rpm-software-management/rpm/issues/3073
 getent group cockpit-wsinstance >/dev/null || groupadd -r cockpit-wsinstance
 getent passwd cockpit-wsinstance >/dev/null || useradd -r -g cockpit-wsinstance -d /nonexisting -s /sbin/nologin -c "User for cockpit-ws instances" cockpit-wsinstance
 
@@ -529,7 +492,7 @@ if [ "$1" = 1 ]; then
     chmod 644 /etc/cockpit/disallowed-users
 fi
 
-%tmpfiles_create cockpit-tempfiles.conf
+%tmpfiles_create cockpit-ws.conf
 %systemd_post cockpit.socket cockpit.service
 # firewalld only partially picks up changes to its services files without this
 test -f %{_bindir}/firewall-cmd && firewall-cmd --reload --quiet || true
@@ -561,7 +524,7 @@ fi
 Summary:              Cockpit user interface for kernel crash dumping
 Requires:             cockpit-bridge >= %{required_base}
 Requires:             cockpit-shell >= %{required_base}
-Requires:             kexec-tools
+Requires:             /usr/bin/kdumpctl
 BuildArch:            noarch
 
 %description kdump
@@ -697,12 +660,63 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue Jun 11 2024 Release Engineering <releng@openela.org> - 311.2
+* Tue Nov 12 2024 Release Engineering <releng@openela.org> - 323.1
 - Remove recommends on subscription-manager-cockpit if applicable
 
-* Tue Apr 02 2024 Martin Pitt <mpitt@redhat.com> - 311.2-1
-- sosreport: Fix command injection with crafted report names [CVE-2024-2947]
-  (jira#RHEL-31074)
+* Tue Aug 20 2024 Packit <hello@packit.dev> - 323-1
+- metrics: Install valkey instead of redis on RHEL/CentOS 10
+- login: Prevent multiple logins in a single browser session
+- Update documentation links
+
+* Thu Aug 08 2024 Packit <hello@packit.dev> - 322-1
+- shell: Deprecate host switcher
+
+* Wed Jul 17 2024 Fedora Release Engineering <releng@fedoraproject.org> - 321-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_41_Mass_Rebuild
+
+* Wed Jul 10 2024 Packit <hello@packit.dev> - 321-1
+- Bug fixes and performance improvements
+
+* Wed Jul 03 2024 Packit <hello@packit.dev> - 320-1
+- pam-ssh-add: Fix insecure killing of session ssh-agent [CVE-2024-6126]
+- sosreport: Read report directory from sos config (fix page on Debian/Ubuntu)
+
+* Wed Jun 26 2024 Packit <hello@packit.dev> - 319-1
+- List btrfs snapshots in subvolume detail view
+
+* Mon Jun 17 2024 Martin Pitt <mpitt@redhat.com> - 318-2
+- Rebuilt for Python 3.13
+
+* Wed Jun 12 2024 Packit <hello@packit.dev> - 318-1
+- Storage: Extra confirmation before deleting non-empty partitions in Anaconda's Web UI
+- Discontinue Intel 32-bit support in Fedora, CentOS, and RHEL
+- cockpit.js: Get user primary group ID
+
+* Sun Jun 09 2024 Python Maint <python-maint@redhat.com> - 317-2
+- Rebuilt for Python 3.13
+
+* Wed May 29 2024 Packit <hello@packit.dev> - 317-1
+- webserver: System user changes
+- metrics: Prefer valkey over redis on Fedora
+
+* Thu Apr 25 2024 Packit <hello@packit.dev> - 316-1
+- cockpit.js API: Fix format_bytes() units
+
+* Wed Apr 10 2024 Packit <hello@packit.dev> - 315-1
+- systemd: Check proper ssh service unit on Debian/Ubuntu
+- Translation updates
+
+* Thu Mar 28 2024 Packit <hello@packit.dev> - 314-1
+- Diagnostic reports: Fix command injection vulnerability with crafted report names
+- Storage: Improvements to read-only encrypted filesystems
+
+* Wed Mar 13 2024 Packit <hello@packit.dev> - 313-1
+- assorted bug fixes and improvements
+
+* Wed Feb 28 2024 Packit <hello@packit.dev> - 312-1
+- Accounts: support lastlog2 and make the page faster
+- Storage: Various Anaconda mode fixes
+- Fix package build if cockpit-bridge package is installed
 
 * Tue Feb 20 2024 Packit <hello@packit.dev> - 311.1-1
 - Update documentation links to RHEL 9 (RHEL-3954)
