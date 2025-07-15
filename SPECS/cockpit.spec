@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              310.4
+Version:              310.5
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              cockpit.css.gz
@@ -787,8 +787,11 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Thu Jun 06 2024 Release Engineering <releng@openela.org> - 310.4
+* Tue Jul 15 2025 Release Engineering <releng@openela.org> - 310.5
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Thu Jul 03 2025 Martin Pitt <mpitt@redhat.com> - 310.5-1
+- Avoid faillocking account on changed sudo password (jira#RHEL-96193)
 
 * Tue Apr 02 2024 Martin Pitt <mpitt@redhat.com> - 310.4-1
 - sosreport: Fix command injection with crafted report names [CVE-2024-2947]
