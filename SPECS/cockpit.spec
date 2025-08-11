@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              334.1
+Version:              334.2
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 
@@ -597,8 +597,11 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue May 13 2025 Release Engineering <releng@openela.org> - 334.1
+* Mon Aug 11 2025 Release Engineering <releng@openela.org> - 334.2
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Wed Aug 06 2025 Martin Pitt <mpitt@redhat.com> - 334.2-1
+- bridge: Fix inotify memory leak (RHEL-107665)
 
 * Mon Mar 10 2025 Martin Pitt <mpitt@redhat.com> - 334.1-1
 - translation updates (RHEL-80289)
