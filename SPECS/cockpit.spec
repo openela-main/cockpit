@@ -37,6 +37,14 @@
 
 %define __lib lib
 
+%if 0%{?suse_version} > 1500
+%define pamconfdir %{_pam_vendordir}
+%define pamconfig tools/cockpit.suse.pam
+%else
+%define pamconfdir %{_sysconfdir}/pam.d
+%define pamconfig tools/cockpit.pam
+%endif
+
 %if %{defined _pamdir}
 %define pamdir %{_pamdir}
 %else
@@ -49,7 +57,7 @@ Summary:        Web Console for Linux servers
 License:        LGPL-2.1-or-later
 URL:            https://cockpit-project.org/
 
-Version:        334.1
+Version:        344
 Release:        1%{?dist}
 Source0:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 
@@ -155,15 +163,20 @@ BuildRequires:  python3-pytest-timeout
 %check
 make -j$(nproc) check
 
-%if 0%{?rhel} == 0
+%if 0%{?rhel} == 0 && 0%{?suse_version} == 0
 export NO_QUNIT=1
 %pytest
 %endif
 
 %install
+%if 0%{?suse_version}
+export NO_BRP_STALE_LINK_ERROR="yes"
+%endif
 %make_install
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/pam.d
-install -p -m 644 tools/cockpit.pam $RPM_BUILD_ROOT%{_sysconfdir}/pam.d/cockpit
+
+mkdir -p $RPM_BUILD_ROOT%{pamconfdir}
+install -p -m 644 %{pamconfig} $RPM_BUILD_ROOT%{pamconfdir}/cockpit
+
 rm -f %{buildroot}/%{_libdir}/cockpit/*.so
 install -D -p -m 644 AUTHORS COPYING README.md %{buildroot}%{_docdir}/cockpit/
 
@@ -214,7 +227,12 @@ find %{buildroot}%{_datadir}/cockpit/static -type f >> static.list
 
 sed -i "s|%{buildroot}||" *.list
 
-%if ! 0%{?suse_version}
+%if 0%{?suse_version}
+# remove files of not installable packages
+rm -r %{buildroot}%{_datadir}/cockpit/sosreport
+rm -f %{buildroot}/%{_prefix}/share/metainfo/org.cockpit_project.cockpit_sosreport.metainfo.xml
+rm -f %{buildroot}%{_datadir}/icons/hicolor/64x64/apps/cockpit-sosreport.png
+%else
 %global _debugsource_packages 1
 %global _debuginfo_subpackages 0
 
@@ -245,6 +263,7 @@ It offers network configuration, log inspection, diagnostic reports, SELinux
 troubleshooting, interactive command-line sessions, and more.
 
 %files
+%license COPYING
 %{_docdir}/cockpit/AUTHORS
 %{_docdir}/cockpit/COPYING
 %{_docdir}/cockpit/README.md
@@ -255,12 +274,14 @@ troubleshooting, interactive command-line sessions, and more.
 
 %package bridge
 Summary: Cockpit bridge server-side component
+BuildArch: noarch
 
 %description bridge
 The Cockpit bridge component installed server side and runs commands on the
 system on behalf of the web based user interface.
 
 %files bridge -f base.list
+%license COPYING
 %doc %{_mandir}/man1/cockpit-bridge.1.gz
 %{_bindir}/cockpit-bridge
 %{_libexecdir}/cockpit-askpass
@@ -276,6 +297,7 @@ deploy Cockpit on their machines as well as helps developers who want to
 embed or extend Cockpit.
 
 %files doc
+%license COPYING
 %exclude %{_docdir}/cockpit/AUTHORS
 %exclude %{_docdir}/cockpit/COPYING
 %exclude %{_docdir}/cockpit/README.md
@@ -310,12 +332,12 @@ Provides: cockpit-selinux = %{version}-%{release}
 Provides: cockpit-sosreport = %{version}-%{release}
 %endif
 
-Provides: bundled(npm(@patternfly/patternfly)) = 5.4.2
-Provides: bundled(npm(@patternfly/react-core)) = 5.4.12
-Provides: bundled(npm(@patternfly/react-icons)) = 5.4.2
-Provides: bundled(npm(@patternfly/react-styles)) = 5.4.1
-Provides: bundled(npm(@patternfly/react-table)) = 5.4.14
-Provides: bundled(npm(@patternfly/react-tokens)) = 5.4.1
+Provides: bundled(npm(@patternfly/patternfly)) = 6.3.0
+Provides: bundled(npm(@patternfly/react-core)) = 6.3.0
+Provides: bundled(npm(@patternfly/react-icons)) = 6.3.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.3.0
+Provides: bundled(npm(@patternfly/react-table)) = 6.3.0
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.3.0
 Provides: bundled(npm(@xterm/addon-canvas)) = 0.7.0
 Provides: bundled(npm(@xterm/xterm)) = 5.5.0
 Provides: bundled(npm(argparse)) = 1.0.10
@@ -323,7 +345,7 @@ Provides: bundled(npm(attr-accept)) = 2.2.5
 Provides: bundled(npm(autolinker)) = 3.16.2
 Provides: bundled(npm(dequal)) = 2.0.3
 Provides: bundled(npm(file-selector)) = 2.1.2
-Provides: bundled(npm(focus-trap)) = 7.6.2
+Provides: bundled(npm(focus-trap)) = 7.6.4
 Provides: bundled(npm(js-tokens)) = 4.0.0
 Provides: bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.1
 Provides: bundled(npm(lodash)) = 4.17.21
@@ -331,7 +353,7 @@ Provides: bundled(npm(loose-envify)) = 1.4.0
 Provides: bundled(npm(object-assign)) = 4.1.1
 Provides: bundled(npm(prop-types)) = 15.8.1
 Provides: bundled(npm(react-dom)) = 18.3.1
-Provides: bundled(npm(react-dropzone)) = 14.3.5
+Provides: bundled(npm(react-dropzone)) = 14.3.8
 Provides: bundled(npm(react-is)) = 16.13.1
 Provides: bundled(npm(react)) = 18.3.1
 Provides: bundled(npm(remarkable)) = 2.0.1
@@ -340,12 +362,13 @@ Provides: bundled(npm(sprintf-js)) = 1.0.3
 Provides: bundled(npm(tabbable)) = 6.2.0
 Provides: bundled(npm(throttle-debounce)) = 5.0.2
 Provides: bundled(npm(tslib)) = 2.8.1
-Provides: bundled(npm(uuid)) = 11.0.5
+Provides: bundled(npm(uuid)) = 11.1.0
 
 %description system
 This package contains the Cockpit shell and system configuration interfaces.
 
 %files system -f system.list
+%license COPYING
 %dir %{_datadir}/cockpit/shell/images
 
 %package ws
@@ -353,8 +376,7 @@ Summary: Cockpit Web Service
 Requires: glib-networking
 Requires: openssl
 Requires: glib2 >= 2.50.0
-Requires: (selinux-policy >= %{_selinux_policy_version} if selinux-policy-%{selinuxtype})
-Requires(post): (policycoreutils if selinux-policy-%{selinuxtype})
+Requires: (%{name}-ws-selinux = %{version}-%{release} if selinux-policy-base)
 Recommends: sscg >= 2.3
 Recommends: system-logos
 Suggests: sssd-dbus >= 2.6.2
@@ -372,6 +394,7 @@ If sssd-dbus is installed, you can enable client certificate/smart card
 authentication via sssd/FreeIPA.
 
 %files ws -f static.list
+%license COPYING
 %doc %{_mandir}/man1/cockpit-desktop.1.gz
 %doc %{_mandir}/man5/cockpit.conf.5.gz
 %doc %{_mandir}/man8/cockpit-ws.8.gz
@@ -379,7 +402,8 @@ authentication via sssd/FreeIPA.
 %doc %{_mandir}/man8/pam_ssh_add.8.gz
 %dir %{_sysconfdir}/cockpit
 %config(noreplace) %{_sysconfdir}/cockpit/ws-certs.d
-%config(noreplace) %{_sysconfdir}/pam.d/cockpit
+%config(noreplace) %{pamconfdir}/cockpit
+
 # created in %post, so that users can rm the files
 %ghost %{_sysconfdir}/issue.d/cockpit.issue
 %ghost %{_sysconfdir}/motd.d/cockpit
@@ -414,22 +438,8 @@ authentication via sssd/FreeIPA.
 %{_libexecdir}/cockpit-certificate-helper
 %{_libexecdir}/cockpit-session
 %{_datadir}/cockpit/branding
-%{_datadir}/selinux/packages/%{selinuxtype}/%{name}.pp.bz2
-%{_mandir}/man8/%{name}_session_selinux.8cockpit.*
-%{_mandir}/man8/%{name}_ws_selinux.8cockpit.*
-%ghost %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{name}
-
-%pre ws
-if %{_sbindir}/selinuxenabled 2>/dev/null; then
-    %selinux_relabel_pre -s %{selinuxtype}
-fi
 
 %post ws
-if [ -x %{_sbindir}/selinuxenabled ]; then
-    %selinux_modules_install -s %{selinuxtype} %{_datadir}/selinux/packages/%{selinuxtype}/%{name}.pp.bz2
-    %selinux_relabel_post -s %{selinuxtype}
-fi
-
 # set up dynamic motd/issue symlinks on first-time install; don't bring them back on upgrades if admin removed them
 # disable root login on first-time install; so existing installations aren't changed
 if [ "$1" = 1 ]; then
@@ -473,11 +483,36 @@ fi
 %systemd_preun cockpit.socket cockpit.service
 
 %postun ws
-if [ -x %{_sbindir}/selinuxenabled ]; then
-    %selinux_modules_uninstall -s %{selinuxtype} %{name}
-    %selinux_relabel_post -s %{selinuxtype}
-fi
 %systemd_postun_with_restart cockpit.socket cockpit.service
+
+%package ws-selinux
+Summary: SELinux security policy for cockpit-ws
+# older -ws contained the SELinux policy, now split out
+Conflicts: %{name}-ws < 337-1.2025
+Requires(post): selinux-policy-%{selinuxtype} >= %{_selinux_policy_version}
+Requires(post): libselinux-utils
+Requires(post): policycoreutils
+
+%description ws-selinux
+SELinux policy module for the cockpit-ws package.
+
+%files ws-selinux
+%license COPYING
+%{_datadir}/selinux/packages/%{selinuxtype}/%{name}.pp.bz2
+%{_mandir}/man8/%{name}_session_selinux.8cockpit.*
+%{_mandir}/man8/%{name}_ws_selinux.8cockpit.*
+%ghost %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{name}
+
+%pre ws-selinux
+%selinux_relabel_pre -s %{selinuxtype}
+
+%post ws-selinux
+%selinux_modules_install -s %{selinuxtype} %{_datadir}/selinux/packages/%{selinuxtype}/%{name}.pp.bz2
+%selinux_relabel_post -s %{selinuxtype}
+
+%postun ws-selinux
+%selinux_modules_uninstall -s %{selinuxtype} %{name}
+%selinux_relabel_post -s %{selinuxtype}
 
 # -------------------------------------------------------------------------------
 # Sub-packages that are part of cockpit-system in RHEL/CentOS, but separate in Fedora
@@ -488,15 +523,22 @@ fi
 Summary: Cockpit user interface for kernel crash dumping
 Requires: cockpit-bridge >= %{required_base}
 Requires: cockpit-shell >= %{required_base}
+%if 0%{?suse_version}
+Requires: kexec-tools
+%else
 Requires: /usr/bin/kdumpctl
+%endif
 BuildArch: noarch
 
 %description kdump
 The Cockpit component for configuring kernel crash dumping.
 
 %files kdump -f kdump.list
+%license COPYING
 %{_datadir}/metainfo/org.cockpit_project.cockpit_kdump.metainfo.xml
 
+# sosreport is not supported on opensuse yet
+%if !0%{?suse_version}
 %package sosreport
 Summary: Cockpit user interface for diagnostic reports
 Requires: cockpit-bridge >= %{required_base}
@@ -509,8 +551,10 @@ The Cockpit component for creating diagnostic reports with the
 sosreport tool.
 
 %files sosreport -f sosreport.list
+%license COPYING
 %{_datadir}/metainfo/org.cockpit_project.cockpit_sosreport.metainfo.xml
 %{_datadir}/icons/hicolor/64x64/apps/cockpit-sosreport.png
+%endif
 
 %package networkmanager
 Summary: Cockpit user interface for networking, using NetworkManager
@@ -525,6 +569,7 @@ BuildArch: noarch
 The Cockpit component for managing networking.  This package uses NetworkManager.
 
 %files networkmanager -f networkmanager.list
+%license COPYING
 %{_datadir}/metainfo/org.cockpit_project.cockpit_networkmanager.metainfo.xml
 
 %endif
@@ -535,7 +580,10 @@ The Cockpit component for managing networking.  This package uses NetworkManager
 Summary: Cockpit SELinux package
 Requires: cockpit-bridge >= %{required_base}
 Requires: cockpit-shell >= %{required_base}
-Requires: setroubleshoot-server >= 3.3.3
+# setroubleshoot is available on SLE Micro starting with 5.5
+%if !0%{?is_smo} || ( 0%{?is_smo} && 0%{?sle_version} >= 150500 )
+Requires:       setroubleshoot-server >= 3.3.3
+%endif
 BuildArch: noarch
 
 %description selinux
@@ -543,6 +591,7 @@ This package contains the Cockpit user interface integration with the
 utility setroubleshoot to diagnose and resolve SELinux issues.
 
 %files selinux -f selinux.list
+%license COPYING
 %{_datadir}/metainfo/org.cockpit_project.cockpit_selinux.metainfo.xml
 
 %endif
@@ -570,6 +619,7 @@ BuildArch: noarch
 The Cockpit component for managing storage.  This package uses udisks.
 
 %files -n cockpit-storaged -f storaged.list
+%license COPYING
 %{_datadir}/metainfo/org.cockpit_project.cockpit_storaged.metainfo.xml
 
 %post storaged
@@ -593,11 +643,69 @@ The Cockpit components for installing OS updates and Cockpit add-ons,
 via PackageKit.
 
 %files -n cockpit-packagekit -f packagekit.list
+%license COPYING
 
 # The changelog is automatically generated and merged
 %changelog
-* Mon Mar 10 2025 Martin Pitt <mpitt@redhat.com> - 334.1-1
-- translation updates (RHEL-80291)
+* Wed Aug 06 2025 Packit <hello@packit.dev> - 344-1
+Bug fixes and translation updates
+
+* Wed Jul 23 2025 Fedora Release Engineering <releng@fedoraproject.org> - 343-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_43_Mass_Rebuild
+
+* Wed Jul 23 2025 Packit <hello@packit.dev> - 343-1
+- Bug fixes and translation updates
+
+* Wed Jul 09 2025 Packit <hello@packit.dev> - 342-1
+- Bug fixes and translation updates
+
+* Fri Jun 27 2025 Packit <hello@packit.dev> - 341.1-1
+- Stratis gating fixes
+
+* Wed Jun 25 2025 Packit <hello@packit.dev> - 341-1
+- services: show link to podman page for quadlets
+
+* Fri Jun 06 2025 Python Maint <python-maint@redhat.com> - 340-2
+- Rebuilt for Python 3.14
+
+* Wed Jun 04 2025 Packit <hello@packit.dev> - 340-1
+- Storage: Prevent modifying partitions in unsupported places
+- Bug fixes and translation updates
+
+* Tue Jun 03 2025 Python Maint <python-maint@redhat.com> - 339-2
+- Rebuilt for Python 3.14
+
+* Wed May 21 2025 Packit <hello@packit.dev> - 339-1
+- Add cockpit/ws arm64 container
+- Storage: Disk Self-Test error warnings on the overview page
+- Bug fixes and translation updates
+
+* Wed May 07 2025 Packit <hello@packit.dev> - 338-1
+- Translation updates
+- Bug fixes
+
+* Wed Apr 23 2025 Packit <hello@packit.dev> - 337-1
+- Upgraded to Patternfly 6
+- Support dnf needs-restarting
+
+* Fri Mar 28 2025 Packit <hello@packit.dev> - 336.2-1
+- storage: Revert "Use mdraid metadata version 1.0 when in Anaconda mode" (rhbz#2352953)
+- Translation updates (rhbz#2354986)
+
+* Wed Mar 26 2025 Packit <hello@packit.dev> - 336.1-1
+- storage: Fix passphrase remembering with "Reuse encryption" (rhbz#2354497)
+- Translation updates (rhbz#2354986)
+
+* Mon Mar 24 2025 Packit <hello@packit.dev> - 336-1
+- storage: Implement deletion of multi-device btrfs (rhbz#2352385)
+- storage: Use mdraid metadata version 1.0 when in Anaconda mode (rhbz#2352953)
+- Add a channel capabilities system
+
+* Wed Mar 12 2025 Packit <hello@packit.dev> - 335-1
+- storage: SMART support
+
+* Thu Feb 27 2025 Packit <hello@packit.dev> - 334-1
+- https://issues.redhat.com/browse/RHEL-32834
 
 * Thu Feb 13 2025 Packit <hello@packit.dev> - 333-1
 - various bug fixes and improvements
