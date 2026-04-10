@@ -1,0 +1,13 @@
+Only in cockpit-356.orig: cockpit-356
+diff -aur cockpit-356.orig/src/cockpit/_vendor/ferny/session.py cockpit-356/src/cockpit/_vendor/ferny/session.py
+--- cockpit-356.orig/src/cockpit/_vendor/ferny/session.py	2026-03-24 19:32:57.640824773 +0100
++++ cockpit-356/src/cockpit/_vendor/ferny/session.py	2026-03-24 19:36:59.515400966 +0100
+@@ -145,7 +145,7 @@
+ 
+         # SSH_ASKPASS_REQUIRE is not generally available, so use setsid
+         process = await asyncio.create_subprocess_exec(
+-            *('/usr/bin/ssh', *args, destination), env=env,
++            *('/usr/bin/ssh', *args, '--', destination), env=env,
+             start_new_session=True, stdin=asyncio.subprocess.DEVNULL,
+             stdout=asyncio.subprocess.DEVNULL, stderr=agent,  # type: ignore
+             preexec_fn=lambda: prctl(PR_SET_PDEATHSIG, signal.SIGKILL))
