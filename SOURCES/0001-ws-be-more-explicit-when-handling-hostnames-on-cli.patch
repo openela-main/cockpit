@@ -1,0 +1,64 @@
+From 390bf80b42c2e3dc8c3c6e04f60f8f28bcf4449c Mon Sep 17 00:00:00 2001
+From: Allison Karlitskaya <allison.karlitskaya@redhat.com>
+Date: Tue, 24 Mar 2026 15:44:15 +0100
+Subject: [PATCH] ws: be more explicit when handling hostnames on cli
+
+`cockpit-ws` has never protected hostnames from being interpreted as cli
+options when passing them to the auth commands (`cockpit-session`,
+`cockpit-ssh`, `cockpit.beiboot`).  There have been a couple of relevant
+changes over the years:
+
+  - our move to using cockpit-session via unix socket has removed
+    exposure to this problem for `cockpit-session`
+
+  - our move from `cockpit-ssh` (glib argument parser) to
+    `cockpit.beiboot` (Python argparse) has unfortunately exposed us to
+    https://github.com/python/cpython/issues/66623 which means (due to a
+    strange heuristic) that arguments starting with '-' can be
+    interpreted as positionals if they also have spaces in them
+
+This gives a way to get a hostname starting with a `-` to ssh (where it
+*will* be interpreted as an option) and the following argument (the
+python invocation on the remote) will be interpreted as the hostname.
+Fortunately, new versions of ssh will reject this hostname.  In any
+case, we should firm up the code here and add `--` to ensure that it's
+definitely interpreted as a hostname by ssh.
+
+For a similar reason add a `--` to the ssh command in `cockpit-ws`.
+---
+ src/cockpit/beiboot.py | 4 ++--
+ src/ws/cockpitauth.c   | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/cockpit/beiboot.py b/src/cockpit/beiboot.py
+index e26f61e315..b0dffcb51a 100644
+--- a/src/cockpit/beiboot.py
++++ b/src/cockpit/beiboot.py
+@@ -250,9 +250,9 @@ def via_ssh(cmd: Sequence[str], dest: str, ssh_askpass: Path, *ssh_opts: str) ->
+         # strip off [] IPv6 brackets
+         if host.startswith('[') and host.endswith(']'):
+             host = host[1:-1]
+-        destination = ['-p', port, host]
++        destination = ['-p', port, '--', host]
+     else:
+-        destination = [dest]
++        destination = ['--', dest]
+ 
+     return (
+         'ssh', *ssh_opts, *destination, shlex.join(cmd)
+diff --git a/src/ws/cockpitauth.c b/src/ws/cockpitauth.c
+index bbde931f9d..7554ee835c 100644
+--- a/src/ws/cockpitauth.c
++++ b/src/ws/cockpitauth.c
+@@ -36,7 +36,7 @@
+ 
+ /* we only support beibooting machines with a known/vetted OS, as it's impossible to guarantee
+  * forward compatibility for all pages */
+-const gchar *cockpit_ws_ssh_program = "/usr/bin/env python3 -m cockpit.beiboot --remote-bridge=supported";
++const gchar *cockpit_ws_ssh_program = "/usr/bin/env python3 -m cockpit.beiboot --remote-bridge=supported --";
+ 
+ /* Some tunables that can be set from tests */
+ const gchar *cockpit_ws_session_program = NULL;
+-- 
+2.53.0
+
