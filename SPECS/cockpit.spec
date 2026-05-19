@@ -1,18 +1,6 @@
 #
 # Copyright (C) 2014-2020 Red Hat, Inc.
-#
-# Cockpit is free software; you can redistribute it and/or modify it
-# under the terms of the GNU Lesser General Public License as published by
-# the Free Software Foundation; either version 2.1 of the License, or
-# (at your option) any later version.
-#
-# Cockpit is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with Cockpit; If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: LGPL-2.1-or-later
 #
 
 # This file is maintained at the following location:
@@ -51,18 +39,26 @@
 %define pamdir %{_libdir}/security
 %endif
 
+# distributions which ship nodejs-esbuild can rebuild the bundle during package build
+# allow override from command line (e.g. for development builds)
+%if 0%{?fedora} >= 42
+%{!?rebuild_bundle: %define rebuild_bundle 1}
+%endif
+
+# to avoid using asciidoc-py in RHEL and CentOS we use the prebuilt docs
+%if 0%{?rhel}
+%define bundle_docs 1
+%endif
+
 Name:           cockpit
 Summary:        Web Console for Linux servers
-
-License:        LGPL-2.1-or-later
+License:        LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:            https://cockpit-project.org/
 
-Version:        344
-Release:        3%{?dist}
+Version:        356
+Release:        1%{?dist}
 Source0:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
-
-Patch001:         0001-ws-be-more-explicit-when-handling-hostnames-on-cli.patch
-Patch002:         0002-ferny-explicit-hostname-handling.patch
+Source1:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
 
 %if 0%{?fedora} >= 41 || 0%{?rhel}
 ExcludeArch: %{ix86}
@@ -91,11 +87,10 @@ BuildRequires: openssl-devel
 BuildRequires: gnutls-devel >= 3.4.3
 BuildRequires: zlib-devel
 BuildRequires: krb5-devel >= 1.11
-BuildRequires: libxslt-devel
 BuildRequires: glib-networking
 BuildRequires: sed
 
-BuildRequires: glib2-devel >= 2.50.0
+BuildRequires: glib2-devel >= 2.68.0
 # this is for runtimedir in the tls proxy ace21c8879
 BuildRequires: systemd-devel >= 235
 %if 0%{?suse_version}
@@ -105,13 +100,23 @@ BuildRequires: distribution-logos
 BuildRequires: wallpaper-branding
 %else
 BuildRequires: openssh-clients
-BuildRequires: docbook-style-xsl
 %endif
 BuildRequires: krb5-server
 BuildRequires: gdb
 
-# For documentation
-BuildRequires: xmlto
+%if 0%{?rebuild_bundle}
+BuildRequires: nodejs
+BuildRequires: %{_bindir}/node
+BuildRequires: nodejs-esbuild
+%endif
+
+%if !%{defined bundle_docs}
+%if 0%{?suse_version}
+BuildRequires: rubygem(asciidoctor)
+%else
+BuildRequires: asciidoctor
+%endif
+%endif
 
 BuildRequires:  selinux-policy
 BuildRequires:  selinux-policy-devel
@@ -126,6 +131,9 @@ Requires: cockpit-system
 # Optional components
 Recommends: (cockpit-storaged if udisks2)
 Recommends: (cockpit-packagekit if dnf)
+%if 0%{?suse_version} == 0
+Recommends: (dnf5daemon-server if dnf5)
+%endif
 Suggests: python3-pcp
 
 %if 0%{?rhel} == 0
@@ -135,7 +143,7 @@ Recommends: (cockpit-ostree if rpm-ostree)
 Suggests: cockpit-selinux
 %endif
 %if 0%{?rhel} && 0%{?centos} == 0
-Requires: subscription-manager-cockpit
+Recommends: subscription-manager-cockpit
 %endif
 
 BuildRequires:  python3-devel
@@ -149,9 +157,20 @@ BuildRequires:  python3-pytest-timeout
 
 %prep
 %setup -q -n cockpit-%{version}
-%autopatch -p1
+%if 0%{?rebuild_bundle}
+%setup -q -D -T -a 1 -n cockpit-%{version}
+%endif
 
 %build
+%if 0%{?rebuild_bundle}
+rm -rf dist
+# HACK: node module packaging is currently broken in Fedora ≤ 43, should be in
+# common location, not major version specific one
+NODE_ENV=production NODE_PATH=/usr/lib/node_modules:$(echo /usr/lib/node_modules_*) ./build.js
+%else
+# Use pre-built bundle on distributions without nodejs-esbuild
+%endif
+
 %configure \
     %{?selinux_configure_arg} \
 %if 0%{?suse_version}
@@ -160,6 +179,9 @@ BuildRequires:  python3-pytest-timeout
     --with-pamdir='%{pamdir}' \
 %if %{enable_multihost}
     --enable-multihost \
+%endif
+%if %{defined bundle_docs}
+    --disable-doc \
 %endif
 
 %make_build
@@ -182,7 +204,21 @@ mkdir -p $RPM_BUILD_ROOT%{pamconfdir}
 install -p -m 644 %{pamconfig} $RPM_BUILD_ROOT%{pamconfdir}/cockpit
 
 rm -f %{buildroot}/%{_libdir}/cockpit/*.so
-install -D -p -m 644 AUTHORS COPYING README.md %{buildroot}%{_docdir}/cockpit/
+install -D -p -m 644 AUTHORS README.md %{buildroot}%{_docdir}/cockpit/
+
+# We install the upstream pre-built docs as we can't build them
+%if %{defined bundle_docs}
+%define docbundledir %{_builddir}/%{name}-%{version}/doc/output/html
+install -d %{buildroot}%{_docdir}/cockpit/guide
+cp -rp %{docbundledir}/* %{buildroot}%{_docdir}/cockpit/guide/
+# Install pre-built man pages
+%define manbundledir %{_builddir}/%{name}-%{version}/doc/output/man
+for section in 1 5 8; do
+  for manpage in %{manbundledir}/*.${section}; do
+    install -D -p -m 644 "$manpage" %{buildroot}%{_mandir}/man${section}/$(basename "$manpage")
+  done
+done
+%endif
 
 # Build the package lists for resource packages
 # cockpit-bridge is the basic dependency for all cockpit-* packages, so centrally own the page directory
@@ -267,9 +303,8 @@ It offers network configuration, log inspection, diagnostic reports, SELinux
 troubleshooting, interactive command-line sessions, and more.
 
 %files
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_docdir}/cockpit/AUTHORS
-%{_docdir}/cockpit/COPYING
 %{_docdir}/cockpit/README.md
 %{_datadir}/metainfo/org.cockpit_project.cockpit.appdata.xml
 %{_datadir}/icons/hicolor/128x128/apps/cockpit.png
@@ -285,7 +320,7 @@ The Cockpit bridge component installed server side and runs commands on the
 system on behalf of the web based user interface.
 
 %files bridge -f base.list
-%license COPYING
+%license LICENSES/GPL-3.0.txt
 %doc %{_mandir}/man1/cockpit-bridge.1.gz
 %{_bindir}/cockpit-bridge
 %{_libexecdir}/cockpit-askpass
@@ -301,9 +336,8 @@ deploy Cockpit on their machines as well as helps developers who want to
 embed or extend Cockpit.
 
 %files doc
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %exclude %{_docdir}/cockpit/AUTHORS
-%exclude %{_docdir}/cockpit/COPYING
 %exclude %{_docdir}/cockpit/README.md
 %{_docdir}/cockpit
 
@@ -325,7 +359,6 @@ Provides: cockpit-users = %{version}-%{release}
 Requires: NetworkManager >= 1.6
 Requires: sos
 Requires: sudo
-Recommends: PackageKit
 Recommends: setroubleshoot-server >= 3.3.3
 Recommends: /usr/bin/kdumpctl
 Suggests: NetworkManager-team
@@ -336,50 +369,40 @@ Provides: cockpit-selinux = %{version}-%{release}
 Provides: cockpit-sosreport = %{version}-%{release}
 %endif
 
-Provides: bundled(npm(@patternfly/patternfly)) = 6.3.0
-Provides: bundled(npm(@patternfly/react-core)) = 6.3.0
-Provides: bundled(npm(@patternfly/react-icons)) = 6.3.0
-Provides: bundled(npm(@patternfly/react-styles)) = 6.3.0
-Provides: bundled(npm(@patternfly/react-table)) = 6.3.0
-Provides: bundled(npm(@patternfly/react-tokens)) = 6.3.0
-Provides: bundled(npm(@xterm/addon-canvas)) = 0.7.0
-Provides: bundled(npm(@xterm/xterm)) = 5.5.0
-Provides: bundled(npm(argparse)) = 1.0.10
-Provides: bundled(npm(attr-accept)) = 2.2.5
-Provides: bundled(npm(autolinker)) = 3.16.2
+Provides: bundled(npm(@patternfly/patternfly)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-core)) = 6.4.1
+Provides: bundled(npm(@patternfly/react-icons)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-table)) = 6.4.1
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.4.0
+Provides: bundled(npm(@xterm/addon-webgl)) = 0.19.0
+Provides: bundled(npm(@xterm/xterm)) = 6.0.0
 Provides: bundled(npm(dequal)) = 2.0.3
-Provides: bundled(npm(file-selector)) = 2.1.2
 Provides: bundled(npm(focus-trap)) = 7.6.4
-Provides: bundled(npm(js-tokens)) = 4.0.0
+Provides: bundled(npm(ipaddr.js)) = 2.3.0
 Provides: bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.1
-Provides: bundled(npm(lodash)) = 4.17.21
-Provides: bundled(npm(loose-envify)) = 1.4.0
-Provides: bundled(npm(object-assign)) = 4.1.1
+Provides: bundled(npm(lodash)) = 4.17.23
 Provides: bundled(npm(prop-types)) = 15.8.1
-Provides: bundled(npm(react-dom)) = 18.3.1
-Provides: bundled(npm(react-dropzone)) = 14.3.8
-Provides: bundled(npm(react-is)) = 16.13.1
 Provides: bundled(npm(react)) = 18.3.1
+Provides: bundled(npm(react-dom)) = 18.3.1
 Provides: bundled(npm(remarkable)) = 2.0.1
 Provides: bundled(npm(scheduler)) = 0.23.2
-Provides: bundled(npm(sprintf-js)) = 1.0.3
-Provides: bundled(npm(tabbable)) = 6.2.0
+Provides: bundled(npm(tabbable)) = 6.4.0
 Provides: bundled(npm(throttle-debounce)) = 5.0.2
 Provides: bundled(npm(tslib)) = 2.8.1
-Provides: bundled(npm(uuid)) = 11.1.0
+Provides: bundled(npm(uuid)) = 13.0.0
 
 %description system
 This package contains the Cockpit shell and system configuration interfaces.
 
 %files system -f system.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %dir %{_datadir}/cockpit/shell/images
 
 %package ws
 Summary: Cockpit Web Service
-Requires: glib-networking
 Requires: openssl
-Requires: glib2 >= 2.50.0
+Requires: glib2 >= 2.68.0
 Requires: (%{name}-ws-selinux = %{version}-%{release} if selinux-policy-base)
 Recommends: sscg >= 2.3
 Recommends: system-logos
@@ -398,7 +421,7 @@ If sssd-dbus is installed, you can enable client certificate/smart card
 authentication via sssd/FreeIPA.
 
 %files ws -f static.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %doc %{_mandir}/man1/cockpit-desktop.1.gz
 %doc %{_mandir}/man5/cockpit.conf.5.gz
 %doc %{_mandir}/man8/cockpit-ws.8.gz
@@ -431,7 +454,6 @@ authentication via sssd/FreeIPA.
 %{_unitdir}/system-cockpithttps.slice
 %{_prefix}/%{__lib}/tmpfiles.d/cockpit-ws.conf
 %{pamdir}/pam_ssh_add.so
-%{pamdir}/pam_cockpit_cert.so
 %{_libexecdir}/cockpit-ws
 %{_libexecdir}/cockpit-wsinstance-factory
 %{_libexecdir}/cockpit-tls
@@ -470,14 +492,6 @@ fi
 # firewalld only partially picks up changes to its services files without this
 test -f %{_bindir}/firewall-cmd && firewall-cmd --reload --quiet || true
 
-# check for deprecated PAM config
-if test -f %{_sysconfdir}/pam.d/cockpit &&  grep -q pam_cockpit_cert %{_sysconfdir}/pam.d/cockpit; then
-    echo '**** WARNING:'
-    echo '**** WARNING: pam_cockpit_cert is a no-op and will be removed in a'
-    echo '**** WARNING: future release; remove it from your /etc/pam.d/cockpit.'
-    echo '**** WARNING:'
-fi
-
 # remove obsolete system user on upgrade (replaced with DynamicUser in version 330)
 if getent passwd cockpit-wsinstance >/dev/null; then
     userdel cockpit-wsinstance
@@ -501,11 +515,11 @@ Requires(post): policycoreutils
 SELinux policy module for the cockpit-ws package.
 
 %files ws-selinux
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/selinux/packages/%{selinuxtype}/%{name}.pp.bz2
 %{_mandir}/man8/%{name}_session_selinux.8cockpit.*
 %{_mandir}/man8/%{name}_ws_selinux.8cockpit.*
-%ghost %{_sharedstatedir}/selinux/%{selinuxtype}/active/modules/200/%{name}
+%ghost %{_selinux_store_path}/%{selinuxtype}/active/modules/200/%{name}
 
 %pre ws-selinux
 %selinux_relabel_pre -s %{selinuxtype}
@@ -538,7 +552,7 @@ BuildArch: noarch
 The Cockpit component for configuring kernel crash dumping.
 
 %files kdump -f kdump.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/metainfo/org.cockpit_project.cockpit_kdump.metainfo.xml
 
 # sosreport is not supported on opensuse yet
@@ -555,7 +569,7 @@ The Cockpit component for creating diagnostic reports with the
 sosreport tool.
 
 %files sosreport -f sosreport.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/metainfo/org.cockpit_project.cockpit_sosreport.metainfo.xml
 %{_datadir}/icons/hicolor/64x64/apps/cockpit-sosreport.png
 %endif
@@ -573,7 +587,7 @@ BuildArch: noarch
 The Cockpit component for managing networking.  This package uses NetworkManager.
 
 %files networkmanager -f networkmanager.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/metainfo/org.cockpit_project.cockpit_networkmanager.metainfo.xml
 
 %endif
@@ -595,7 +609,7 @@ This package contains the Cockpit user interface integration with the
 utility setroubleshoot to diagnose and resolve SELinux issues.
 
 %files selinux -f selinux.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/metainfo/org.cockpit_project.cockpit_selinux.metainfo.xml
 
 %endif
@@ -607,7 +621,7 @@ Requires: udisks2 >= 2.9
 Recommends: udisks2-lvm2 >= 2.9
 Recommends: udisks2-iscsi >= 2.9
 %if ! 0%{?rhel}
-Recommends: udisks2-btrfs >= 2.9
+Recommends: (udisks2-btrfs >= 2.9 if btrfs-progs)
 %endif
 Recommends: device-mapper-multipath
 Recommends: clevis-luks
@@ -623,7 +637,7 @@ BuildArch: noarch
 The Cockpit component for managing storage.  This package uses udisks.
 
 %files -n cockpit-storaged -f storaged.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 %{_datadir}/metainfo/org.cockpit_project.cockpit_storaged.metainfo.xml
 
 %post storaged
@@ -647,15 +661,67 @@ The Cockpit components for installing OS updates and Cockpit add-ons,
 via PackageKit.
 
 %files -n cockpit-packagekit -f packagekit.list
-%license COPYING
+%license LICENSES/LGPL-2.1.txt
 
 # The changelog is automatically generated and merged
 %changelog
-* Wed Apr 01 2026 Jelle van der Waa <jvanderw@redhat.com> - 344-3
-- correctly apply CVE patches (CVE-2026-4631)
+* Wed Feb 11 2026 Packit <hello@packit.dev> - 356-1
+- systemd: Allow editing timers created by Cockpit
+- Convert license headers to SPDX format
 
-* Wed Mar 25 2026 Jelle van der Waa <jvanderw@redhat.com - 344-3
-- ws: be more explicit when handling hostnames on cli (CVE-2026-4631)
+
+* Thu Jan 29 2026 Packit <hello@packit.dev> - 355-1
+- ws: Remove obsolete pam_cockpit_cert module
+- shell: add StartTransientUnit as a sudo alternative
+
+
+* Fri Jan 16 2026 Fedora Release Engineering <releng@fedoraproject.org> - 354-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_44_Mass_Rebuild
+
+* Fri Jan 16 2026 Fedora Release Engineering <releng@fedoraproject.org> - 354-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_44_Mass_Rebuild
+
+* Wed Jan 07 2026 Martin Pitt <mpitt@redhat.com> - 354-1
+- Convert documentation to AsciiDoc
+- Work around Firefox 146/147 bug (rhbz#2422331)
+- Bug fixes
+
+
+* Mon Dec 15 2025 Jelle van der Waa <jelle@vdwaa.nl> - 353.1-1
+- Release workflow fixes
+
+
+* Wed Nov 12 2025 Packit <hello@packit.dev> - 351-1
+- Firewall ports can be deleted individually
+
+* Wed Oct 29 2025 Packit <hello@packit.dev> - 350-1
+- networking: fix renaming of bridges and other groups (RHEL-117883)
+- bridge: fix OpenSSH_10.2p1 host key detection
+
+* Wed Oct 15 2025 Packit <hello@packit.dev> - 349-1
+- Package manifests: Add `any` test
+- Bug fixes and translation updates
+
+* Thu Oct 02 2025 Packit <hello@packit.dev> - 348-1
+- Bug fixes and translation updates
+
+* Fri Sep 19 2025 Python Maint <python-maint@redhat.com> - 347-2
+- Rebuilt for Python 3.14.0rc3 bytecode
+
+* Wed Sep 17 2025 Packit <hello@packit.dev> - 347-1
+- Site-specific branding support
+
+* Wed Sep 03 2025 Packit <hello@packit.dev> - 346-1
+- Support branding Cockpit pages
+- Storage: Support for Stratis "V2" pools
+
+* Wed Aug 20 2025 Packit <hello@packit.dev> - 345-1
+- Translation and dependency updates
+- Shorter IPv6 addresses
+- IPv6 addresses for WireGuard
+
+* Fri Aug 15 2025 Python Maint <python-maint@redhat.com> - 344-2
+- Rebuilt for Python 3.14.0rc2 bytecode
 
 * Wed Aug 06 2025 Packit <hello@packit.dev> - 344-1
 Bug fixes and translation updates
