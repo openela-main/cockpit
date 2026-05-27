@@ -55,7 +55,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:                  https://cockpit-project.org/
 
-Version:              356
+Version:              356.1
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -382,7 +382,7 @@ Provides:             bundled(npm(dequal)) = 2.0.3
 Provides:             bundled(npm(focus-trap)) = 7.6.4
 Provides:             bundled(npm(ipaddr.js)) = 2.3.0
 Provides:             bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.1
-Provides:             bundled(npm(lodash)) = 4.17.23
+Provides:             bundled(npm(lodash)) = 4.18.1
 Provides:             bundled(npm(prop-types)) = 15.8.1
 Provides:             bundled(npm(react)) = 18.3.1
 Provides:             bundled(npm(react-dom)) = 18.3.1
@@ -666,8 +666,13 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue May 19 2026 Release Engineering <releng@openela.org> - 356
+* Wed May 27 2026 Release Engineering <releng@openela.org> - 356.1
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Mon Apr 13 2026 Tomas Matus <tmatus@redhat.com> - 356.1-1
+- ws: Prevent remote code execution with SSH argument injection (RHEL-158310)
+- node: update lodash dependency (RHEL-164196)
+
 
 * Wed Feb 11 2026 Packit <hello@packit.dev> - 356-1
 - systemd: Allow editing timers created by Cockpit
