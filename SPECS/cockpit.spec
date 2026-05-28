@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              310.6
+Version:              310.8
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              cockpit.css.gz
@@ -787,8 +787,16 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue Jan 20 2026 Release Engineering <releng@openela.org> - 310.6
+* Thu May 28 2026 Release Engineering <releng@openela.org> - 310.8
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Wed May 20 2026 Tomas Matus <tmatus@redhat.com> - 310.8-1
+- ws: fix uninitialized read in tls-sniffing code
+- ws: tighten up branding path construction
+- pkg/systemd: robustify argument quoting [CVE-2026-4802] (RHEL-161386)
+
+* Mon Apr 27 2026 Tomas Matus <tmatus@redhat.com> - 310.7-1
+- shell: Determine session idle time and countdown from clock time (RHEL-171011)
 
 * Mon Dec 01 2025 Tomas Matus <tmatus@redhat.com> - 310.6-1
 - networking: Fix renaming of bridges and other groups (RHEL-131249)
