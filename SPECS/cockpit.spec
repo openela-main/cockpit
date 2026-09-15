@@ -55,7 +55,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:                  https://cockpit-project.org/
 
-Version:              356.2
+Version:              356.3
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -666,8 +666,11 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Thu May 28 2026 Release Engineering <releng@openela.org> - 356.2
+* Tue Sep 15 2026 Release Engineering <releng@openela.org> - 356.3
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Thu Aug 13 2026 Jelle van der Waa <jvanderwaa@redhat.com> - 356.3-1
+- sosreport: Provide encryption pass via an env variable (RHEL-220573)
 
 * Mon Apr 13 2026 Tomas Matus <tmatus@redhat.com> - 356.1-1
 - ws: Prevent remote code execution with SSH argument injection (RHEL-158310)
