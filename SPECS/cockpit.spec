@@ -49,7 +49,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later
 URL:                  https://cockpit-project.org/
 
-Version:              310.9
+Version:              310.10
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              cockpit.css.gz
@@ -787,8 +787,13 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Fri Oct 02 2026 Release Engineering <releng@openela.org> - 310.9
+* Tue Nov 03 2026 Release Engineering <releng@openela.org> - 310.10
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Thu Sep 24 2026 tomasmatus <tmatus@redhat.com> - 310.10-1
+- ws: don't crash when urlroot has no trailing slash (RHEL-262904) [CVE-2026-91147]
+- ws: Free language string also when it comes from the cookie (RHEL-244631) [CVE-2026-76235]
+- packagekit: Sanitize markdown urls [CVE-2026-91148]
 
 * Tue Aug 04 2026 Jelle van der Waa <jvanderwaa@redhat.com> - 310.9-1
 - sosreport: Provide encryption pass via an env variable (RHEL-219123)
