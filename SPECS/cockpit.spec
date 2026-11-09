@@ -55,7 +55,7 @@ Summary:        Web Console for Linux servers
 License:        LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:            https://cockpit-project.org/
 
-Version:        356.3
+Version:        356.4
 Release:        1%{?dist}
 Source0:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -665,6 +665,11 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
+* Wed Sep 23 2026 tomasmatus <tmatus@redhat.com> - 356.4-1
+- ws: Free language string also when it comes from the cookie (RHEL-244640) [CVE-2026-76235]
+- ws: don't crash when urlroot has no trailing slash (RHEL-262894) [CVE-2026-91147]
+- tls: Limit concurrent connections (RHEL-263062) [CVE-2026-91149]
+
 * Thu Aug 13 2026 Jelle van der Waa <jvanderwaa@redhat.com> - 356.3-1
 - sosreport: Provide encryption pass via an env variable (RHEL-220574)
 
