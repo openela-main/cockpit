@@ -55,7 +55,7 @@ Summary:        Web Console for Linux servers
 License:        LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:            https://cockpit-project.org/
 
-Version:        356.4
+Version:        366
 Release:        1%{?dist}
 Source0:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:        https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -369,17 +369,17 @@ Provides: cockpit-selinux = %{version}-%{release}
 Provides: cockpit-sosreport = %{version}-%{release}
 %endif
 
-Provides: bundled(npm(@patternfly/patternfly)) = 6.4.0
-Provides: bundled(npm(@patternfly/react-core)) = 6.4.1
-Provides: bundled(npm(@patternfly/react-icons)) = 6.4.0
-Provides: bundled(npm(@patternfly/react-styles)) = 6.4.0
-Provides: bundled(npm(@patternfly/react-table)) = 6.4.1
-Provides: bundled(npm(@patternfly/react-tokens)) = 6.4.0
+Provides: bundled(npm(@patternfly/patternfly)) = 6.6.1
+Provides: bundled(npm(@patternfly/react-core)) = 6.6.0
+Provides: bundled(npm(@patternfly/react-icons)) = 6.6.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.6.0
+Provides: bundled(npm(@patternfly/react-table)) = 6.6.0
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.6.0
 Provides: bundled(npm(@xterm/addon-webgl)) = 0.19.0
 Provides: bundled(npm(@xterm/xterm)) = 6.0.0
 Provides: bundled(npm(dequal)) = 2.0.3
-Provides: bundled(npm(focus-trap)) = 7.6.4
-Provides: bundled(npm(ipaddr.js)) = 2.3.0
+Provides: bundled(npm(focus-trap)) = 7.6.6
+Provides: bundled(npm(ipaddr.js)) = 2.5.0
 Provides: bundled(npm(json-stable-stringify-without-jsonify)) = 1.0.1
 Provides: bundled(npm(lodash)) = 4.18.1
 Provides: bundled(npm(prop-types)) = 15.8.1
@@ -387,10 +387,10 @@ Provides: bundled(npm(react)) = 18.3.1
 Provides: bundled(npm(react-dom)) = 18.3.1
 Provides: bundled(npm(remarkable)) = 2.0.1
 Provides: bundled(npm(scheduler)) = 0.23.2
-Provides: bundled(npm(tabbable)) = 6.4.0
+Provides: bundled(npm(tabbable)) = 6.5.0
 Provides: bundled(npm(throttle-debounce)) = 5.0.2
 Provides: bundled(npm(tslib)) = 2.8.1
-Provides: bundled(npm(uuid)) = 13.0.0
+Provides: bundled(npm(uuid)) = 14.0.1
 
 %description system
 This package contains the Cockpit shell and system configuration interfaces.
@@ -665,17 +665,60 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Wed Sep 23 2026 tomasmatus <tmatus@redhat.com> - 356.4-1
-- ws: Free language string also when it comes from the cookie (RHEL-244640) [CVE-2026-76235]
-- ws: don't crash when urlroot has no trailing slash (RHEL-262894) [CVE-2026-91147]
-- tls: Limit concurrent connections (RHEL-263062) [CVE-2026-91149]
+* Thu Aug 13 2026 Packit <hello@packit.dev> - 366-1
+- Networkmanager: Don't activate new network connections by default
+- Networkmanager: Navigate to details page after creation
+- Translations and dependency updates
 
-* Thu Aug 13 2026 Jelle van der Waa <jvanderwaa@redhat.com> - 356.3-1
-- sosreport: Provide encryption pass via an env variable (RHEL-220574)
+* Thu Jul 30 2026 Packit <hello@packit.dev> - 365-1
+- Translations and dependency updates
+- Fix btrfs subvolume mount option parsing (rhbz#2483145)
 
-* Mon Apr 13 2026 Tomas Matus <tmatus@redhat.com> - 356.1-1
-- ws: Prevent remote code execution with SSH argument injection (RHEL-158306)
-- node: update lodash dependency (RHEL-164067)
+* Wed Jul 15 2026 Fedora Release Engineering <releng@fedoraproject.org> - 364-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_45_Mass_Rebuild
+
+* Tue Jun 23 2026 Packit <hello@packit.dev> - 364-1
+- Bug fixes and translation updates
+
+* Fri Jun 12 2026 Yaakov Selkowitz <yselkowi@redhat.com> - 363.2-2
+- Rebuilt for openssl 4.0
+
+* Mon Jun 08 2026 Packit <hello@packit.dev> - 363.2-1
+- packit: Use tars for propose-downstream
+
+* Thu Jun 04 2026 Python Maint <python-maint@redhat.com> - 362-2
+- Rebuilt for Python 3.15
+
+* Wed May 20 2026 Packit <hello@packit.dev> - 362-1
+- Bug fixes and translation updates
+- Fix arbitrary code execution via specially crafted logs page link (CVE-2026-4802)
+
+* Tue Apr 21 2026 Packit <hello@packit.dev> - 361-1
+- Remove all "Mount" actions in Anaconda mode
+- Dependency updates
+
+* Tue Apr 14 2026 Packit <hello@packit.dev> - 360.1-1
+- Prevent overmounting also for btrfs subvolumes (https://bugzilla.redhat.com/show_bug.cgi?id=2455855)
+- Remove "Mount" action in Anaconda mode (https://bugzilla.redhat.com/show_bug.cgi?id=2455855)
+
+* Wed Apr 08 2026 Packit <hello@packit.dev> - 360-1
+- ws: be more explicit when handling hostnames on cli [CVE-2026-4631]
+- ws: support loading a custom login page
+- Translation updates
+
+* Thu Mar 26 2026 Packit <hello@packit.dev> - 359-1
+- Bug fixes and translation updates
+
+
+* Wed Mar 18 2026 Packit <hello@packit.dev> - 358-1
+- Networking: Add Wi-Fi support
+- Cockpit Client updated to GTK 4
+- Bugfixes and translation updates
+
+
+* Fri Feb 27 2026 Packit <hello@packit.dev> - 357-1
+- lib: Use browser context menu on shift
+- bridge: support Python 3.14 on old kernels (RHEL 8)
 
 
 * Wed Feb 11 2026 Packit <hello@packit.dev> - 356-1
