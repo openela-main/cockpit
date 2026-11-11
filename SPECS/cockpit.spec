@@ -55,7 +55,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:                  https://cockpit-project.org/
 
-Version:              366
+Version:              366.1
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -666,8 +666,13 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Tue Nov 10 2026 Release Engineering <releng@openela.org> - 366
+* Wed Nov 11 2026 Release Engineering <releng@openela.org> - 366.1
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Wed Sep 23 2026 tmatus <tmatus@redhat.com> - 366.1-1
+- ws: Free "language" string also when it comes from the cookie (RHEL-244638) [CVE-2026-76235]
+- ws: don't crash when urlroot has no trailing slash (RHEL-262967) [CVE-2026-91147]
+- tls: Limit concurrent connections (RHEL-263075) [CVE-2026-91149]
 
 * Thu Aug 13 2026 Packit <hello@packit.dev> - 366-1
 - Networkmanager: Don't activate new network connections by default
