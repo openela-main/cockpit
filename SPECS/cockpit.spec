@@ -55,7 +55,7 @@ Summary:              Web Console for Linux servers
 License:              LGPL-2.1-or-later AND GPL-3.0-or-later AND MIT AND CC-BY-SA-3.0 AND BSD-3-Clause
 URL:                  https://cockpit-project.org/
 
-Version:              366.1
+Version:              366.1.1
 Release:              1%{?dist}
 Source0:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-%{version}.tar.xz
 Source1:              https://github.com/cockpit-project/cockpit/releases/download/%{version}/cockpit-node-%{version}.tar.xz
@@ -666,8 +666,12 @@ via PackageKit.
 
 # The changelog is automatically generated and merged
 %changelog
-* Wed Nov 11 2026 Release Engineering <releng@openela.org> - 366.1
+* Thu Nov 12 2026 Release Engineering <releng@openela.org> - 366.1.1
 - Remove recommends on subscription-manager-cockpit if applicable
+
+* Thu Nov 05 2026 Allison Karlitskaya <lis@redhat.com> - 366.1.1-1
+- ws: limit size of reassembled websocket frames (RHEL-263035) [CVE-2026-91150]
+- users: Add authorized SSH key as user (RHEL-263052) [CVE-2026-91151]
 
 * Wed Sep 23 2026 tmatus <tmatus@redhat.com> - 366.1-1
 - ws: Free "language" string also when it comes from the cookie (RHEL-244638) [CVE-2026-76235]
